@@ -53,7 +53,9 @@ func main() {
 	var (
 		dbURI      string
 		dayFileDir string
-		minEnable  bool
+		minSync    bool
+		vipdocDir  string
+		targetDate string
 
 		// Convert
 		inputType  string
@@ -77,7 +79,7 @@ func main() {
 		Example: `  tdx2db cron --dburi 'clickhouse://localhost' --min
   tdx2db cron --dburi 'duckdb://./tdx.db'` + dbURIHelp,
 		RunE: func(c *cobra.Command, args []string) error {
-			return cmd.Cron(ctx, dbURI, minEnable)
+			return cmd.Cron(ctx, dbURI, minSync, vipdocDir, targetDate)
 		},
 	}
 
@@ -117,8 +119,9 @@ func main() {
 
 	// Cron Flags
 	cronCmd.Flags().StringVar(&dbURI, "dburi", "", dbURIInfo)
-	cronCmd.MarkFlagRequired("dburi")
-	cronCmd.Flags().BoolVar(&minEnable, "min", false, minInfo)
+	cronCmd.Flags().BoolVar(&minSync, "min", false, "导入 1 分钟分时数据（可选）")
+	cronCmd.Flags().StringVar(&vipdocDir, "vipdocdir", "", "通达信 vipdoc 目录（可选，默认使用缓存目录）")
+	cronCmd.Flags().StringVar(&targetDate, "date", "", "指定同步日期 (YYYYMMDD，可选)")
 
 	// Convert Flags
 	convertCmd.Flags().StringVarP(&inputType, "type", "t", "", "转换类型")
@@ -137,11 +140,9 @@ func main() {
 	})
 
 	if err := rootCmd.Execute(); err != nil {
-		if err == context.Canceled {
-			fmt.Fprintln(os.Stderr, "✅ 任务安全中断")
-			os.Exit(0)
+		if strings.Contains(err.Error(), "HTTP 404") {
+			os.Exit(10)
 		}
-		fmt.Fprintf(os.Stderr, "🛑 错误: %v\n", err)
 		os.Exit(1)
 	}
 }

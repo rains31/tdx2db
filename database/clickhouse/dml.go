@@ -100,6 +100,28 @@ func (d *ClickHouseDriver) ImportHolidays(path string) error {
 	return d.ImportCSV(model.TableHoliday, path)
 }
 
+func (d *ClickHouseDriver) Exists(table string, where string, args ...interface{}) (bool, error) {
+	query := fmt.Sprintf("SELECT 1 FROM %s", table)
+	if where != "" {
+		query += " WHERE " + where
+	}
+	query += " LIMIT 1"
+
+	var dummy int
+	err := d.db.Get(&dummy, query, args...)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		// ClickHouse 可能返回 empty result set 而不是 ErrNoRows
+		if strings.Contains(err.Error(), "empty result") {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func (d *ClickHouseDriver) Query(table string, conditions map[string]interface{}, dest interface{}) error {
 	query := fmt.Sprintf("SELECT * FROM %s", table)
 	args := []interface{}{}

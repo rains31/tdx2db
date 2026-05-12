@@ -70,6 +70,24 @@ func (d *DuckDBDriver) ImportHolidays(path string) error {
 	return d.ImportCSV(model.TableHoliday, path)
 }
 
+func (d *DuckDBDriver) Exists(table string, where string, args ...interface{}) (bool, error) {
+	query := fmt.Sprintf("SELECT 1 FROM %s", table)
+	if where != "" {
+		query += " WHERE " + where
+	}
+	query += " LIMIT 1"
+
+	var dummy int
+	err := d.db.Get(&dummy, query, args...)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (d *DuckDBDriver) Query(table string, conditions map[string]interface{}, dest interface{}) error {
 	query := fmt.Sprintf("SELECT * FROM %s", table)
 	args := []interface{}{}
@@ -239,8 +257,8 @@ const metaTable = "_meta"
 
 func (d *DuckDBDriver) ReadSchemaVersion() (string, error) {
 	var value string
-	err := d.db.Get(&value,
-		fmt.Sprintf("SELECT value FROM %s WHERE key = 'schema_version'", metaTable))
+	query := fmt.Sprintf("SELECT value FROM %s WHERE key = 'schema_version'", metaTable)
+	err := d.db.Get(&value, query)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}

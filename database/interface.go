@@ -24,6 +24,7 @@ type DataRepository interface {
 	ImportHolidays(csvPath string) error
 
 	TruncateTable(meta *model.TableMeta) error
+	Exists(table string, where string, args ...interface{}) (bool, error)
 	Query(table string, conditions map[string]interface{}, dest interface{}) error
 	QueryKlineDaily(symbol string, startDate, endDate *time.Time) ([]model.KlineDay, error)
 	GetLatestDate(tableName string, dateCol string) (time.Time, error)

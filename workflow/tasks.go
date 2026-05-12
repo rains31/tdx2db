@@ -237,11 +237,18 @@ func executeUpdate1Min(ctx context.Context, db database.DataRepository, args *Ta
 	}
 
 	if len(validDates) > 0 {
-		fmt.Printf("🐌 开始转换1分钟分时数据\n")
+		fmt.Printf("🐌 开始转换1分钟分时数据 (共 %d 天)\n", len(validDates))
 
 		stock1MinCSV := filepath.Join(args.TempDir, "1min.csv")
 
-		_, err := tdx.ConvertFilesToCSV(ctx, args.VipdocDir, stock1MinCSV, ".01")
+		// 路径策略：优先从 TempDir 找（那是 datatool 刚刚转码产出的地方）
+		inputDir := args.VipdocDir
+		if _, err := os.Stat(filepath.Join(args.TempDir, "vipdoc")); err == nil {
+			inputDir = args.TempDir
+			fmt.Printf("📦 检测到新转档数据，正在从临时目录加载...\n")
+		}
+
+		_, err := tdx.ConvertFilesToCSV(ctx, inputDir, stock1MinCSV, ".01")
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert .01 files to csv: %w", err)
 		}
@@ -285,43 +292,55 @@ func getMin1LatestDate(db database.DataRepository, args *TaskArgs) (time.Time, e
 		return args.Today.AddDate(0, 0, -1), nil
 	}
 
-	fmt.Printf("📅 1分钟数据最新日期为 %s\n", latestDate.Format("2006-01-02"))
 	return latestDate, nil
 }
 
 func prepareTdxData(ctx context.Context, latestDate time.Time, dataType string, args *TaskArgs) ([]time.Time, error) {
 	var dates []time.Time
+	// 优先使用 TargetDate (补数据模式)
+	if args.TargetDate != "" {
+		t, err := time.Parse("20060102", args.TargetDate)
+		if err == nil {
+			dates = []time.Time{t}
+		}
+	}
 
-	for d := latestDate.Add(24 * time.Hour); !d.After(args.Today); d = d.Add(24 * time.Hour) {
-		dates = append(dates, d)
+	// 如果没有 TargetDate，则按增量逻辑处理
+	if len(dates) == 0 {
+		for d := latestDate.Add(24 * time.Hour); !d.After(args.Today); d = d.Add(24 * time.Hour) {
+			dates = append(dates, d)
+		}
 	}
 
 	if len(dates) == 0 {
 		return nil, nil
 	}
 
-	var targetPath, urlTemplate, fileSuffix, dataTypeCN string
-
+	homeDir, _ := os.UserHomeDir()
+	baseDownloadDir := filepath.Join(homeDir, "Downloads", "tdx_data", dataType)
+	
+	urlTemplate := ""
+	dataTypeCN := ""
 	switch dataType {
 	case "day":
-		targetPath = filepath.Join(args.VipdocDir, "refmhq")
 		urlTemplate = "https://www.tdx.com.cn/products/data/data/g4day/%s.zip"
-		fileSuffix = "day"
-		dataTypeCN = "日线"
+		dataTypeCN = "日线数据"
 	case "tic":
-		targetPath = filepath.Join(args.VipdocDir, "newdatetick")
 		urlTemplate = "https://www.tdx.com.cn/products/data/data/g4tic/%s.zip"
-		fileSuffix = "tic"
-		dataTypeCN = "分时"
+		dataTypeCN = "分时数据"
 	default:
 		return nil, fmt.Errorf("unknown data type: %s", dataType)
 	}
 
-	if err := os.MkdirAll(targetPath, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create target directory: %w", err)
+	if err := os.MkdirAll(baseDownloadDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create download directory: %w", err)
 	}
 
-	fmt.Printf("🐌 开始下载%s数据\n", dataTypeCN)
+	// 强制清空旧的链接目录，防止旧数据干扰
+	os.RemoveAll(filepath.Join(args.VipdocDir, "refmhq"))
+	os.RemoveAll(filepath.Join(args.VipdocDir, "newdatetick"))
+
+	fmt.Printf("🐌 开始准备%s (存储目录: %s)\n", dataTypeCN, baseDownloadDir)
 
 	validDates := make([]time.Time, 0, len(dates))
 
@@ -332,68 +351,80 @@ func prepareTdxData(ctx context.Context, latestDate time.Time, dataType string, 
 		default:
 		}
 
-		dateStr := date.Format("20060102")
-		url := fmt.Sprintf(urlTemplate, dateStr)
-		fileName := fmt.Sprintf("%s%s.zip", dateStr, fileSuffix)
-		filePath := filepath.Join(targetPath, fileName)
-
-		status, err := utils.DownloadFile(url, filePath)
-		switch status {
-		case 200:
-			fmt.Printf("✅ 已下载 %s 的数据\n", dateStr)
-
-			if err := utils.UnzipFile(filePath, targetPath); err != nil {
-				fmt.Printf("⚠️ 解压文件 %s 失败: %v\n", filePath, err)
+		// 节假日判定
+		if args.Plan != nil && args.Plan.Calendar != nil {
+			if args.Plan.Calendar.IsHoliday(date) || args.Plan.Calendar.IsWeekend(date) {
 				continue
 			}
+		}
 
-			validDates = append(validDates, date)
-		case 404:
-			var cal *TradingCalendar
-			if args.Plan != nil {
-				cal = args.Plan.Calendar
-			}
-			switch {
-			case cal != nil && cal.IsHoliday(date):
-				fmt.Printf("🎉 %s 为节假日，跳过\n", dateStr)
-			case cal != nil && cal.IsWeekend(date):
-				fmt.Printf("🌴 %s 为周末，跳过\n", dateStr)
-			case date.Equal(args.Today):
-				fmt.Printf("⏳ %s 数据尚未发布，请等待收盘后重试\n", dateStr)
-			default:
-				fmt.Printf("🟡 %s 数据尚未发布\n", dateStr)
-			}
-			continue
-		default:
-			if err != nil {
-				return nil, fmt.Errorf("download failed: %w", err)
+		dateStr := date.Format("20060102")
+		url := fmt.Sprintf(urlTemplate, dateStr)
+		zipPath := filepath.Join(baseDownloadDir, dateStr+".zip")
+		extractDir := filepath.Join(baseDownloadDir, dateStr)
+
+		// 1. 下载 (带续传)
+		if _, err := os.Stat(zipPath); os.IsNotExist(err) {
+			fmt.Printf("📥 正在下载 %s %s...\n", dataTypeCN, dateStr)
+			if err := utils.DownloadFileWithResume(url, zipPath); err != nil {
+				fmt.Printf("⚠️  下载跳过 %s: %v (可能尚未发布)\n", dateStr, err)
+				continue
 			}
 		}
+
+		// 2. 解压 (如果解压目录不存在)
+		if _, err := os.Stat(extractDir); os.IsNotExist(err) {
+			fmt.Printf("🔓 正在解压 %s...\n", dateStr)
+			if err := utils.UnzipFile(zipPath, extractDir); err != nil {
+				fmt.Printf("⚠️  解压失败 %s: %v\n", dateStr, err)
+				continue
+			}
+		}
+
+		// 3. 链接到工作目录，供 datatool 使用
+		var tdxSubDir string
+		if dataType == "day" {
+			tdxSubDir = filepath.Join(args.VipdocDir, "refmhq")
+		} else {
+			tdxSubDir = filepath.Join(args.VipdocDir, "newdatetick")
+		}
+		os.MkdirAll(tdxSubDir, 0755)
+
+		// 遍历解压目录，将文件链接/复制到 tdxSubDir
+		files, _ := os.ReadDir(extractDir)
+		for _, f := range files {
+			src := filepath.Join(extractDir, f.Name())
+			dst := filepath.Join(tdxSubDir, f.Name())
+			_ = os.Remove(dst) // 清理旧链接
+			_ = os.Symlink(src, dst)
+		}
+
+		validDates = append(validDates, date)
 	}
 
 	if len(validDates) > 0 {
-		select {
-		case <-ctx.Done():
-			return validDates, ctx.Err()
-		default:
-		}
-
 		endDate := validDates[len(validDates)-1]
 		switch dataType {
 		case "day":
-			if err := tdx.DatatoolCreate(args.TempDir, "day", endDate); err != nil {
+			if err := tdx.DatatoolCreate(args.TempDir, args.VipdocDir, "day", endDate); err != nil {
 				return nil, fmt.Errorf("failed to run DatatoolDayCreate: %w", err)
 			}
-
 		case "tic":
 			fmt.Printf("🐌 开始转档分笔数据\n")
-			if err := tdx.DatatoolCreate(args.TempDir, "tick", endDate); err != nil {
+			if err := tdx.DatatoolCreate(args.TempDir, args.VipdocDir, "tick", endDate); err != nil {
 				return nil, fmt.Errorf("failed to run DatatoolTickCreate: %w", err)
 			}
 			fmt.Printf("🐌 开始转换分钟数据\n")
-			if err := tdx.DatatoolCreate(args.TempDir, "min", endDate); err != nil {
+			if err := tdx.DatatoolCreate(args.TempDir, args.VipdocDir, "min", endDate); err != nil {
 				return nil, fmt.Errorf("failed to run DatatoolMinCreate: %w", err)
 			}
+		}
+
+		// 核心清理：任务完成后，删掉解压出的日期文件夹，只保留 Zip
+		for _, date := range validDates {
+			dateStr := date.Format("20060102")
+			extractDir := filepath.Join(baseDownloadDir, dateStr)
+			os.RemoveAll(extractDir)
 		}
 	}
 
@@ -403,7 +434,7 @@ func prepareTdxData(ctx context.Context, latestDate time.Time, dataType string, 
 func getGbbqFile(cacheDir string) (string, error) {
 	zipPath := filepath.Join(cacheDir, "gbbq.zip")
 	gbbqURL := "http://www.tdx.com.cn/products/data/data/dbf/gbbq.zip"
-	if _, err := utils.DownloadFile(gbbqURL, zipPath); err != nil {
+	if err := utils.DownloadFileWithResume(gbbqURL, zipPath); err != nil {
 		return "", fmt.Errorf("failed to download GBBQ zip file: %w", err)
 	}
 

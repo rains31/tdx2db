@@ -39,3 +39,18 @@ func (c *TradingCalendar) LastTradingDayOnOrBefore(d time.Time) time.Time {
 	}
 	return cur
 }
+func (c *TradingCalendar) IsTradingTime(t time.Time) bool {
+	hour := t.Hour()
+	min := t.Minute()
+	totalMin := hour*60 + min
+
+	// 9:30 - 11:30
+	if totalMin >= 9*60+30 && totalMin <= 11*60+30 {
+		return true
+	}
+	// 13:00 - 15:00
+	if totalMin >= 13*60 && totalMin <= 15*60 {
+		return true
+	}
+	return false
+}

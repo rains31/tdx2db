@@ -43,6 +43,7 @@ func runConversion[T any](
 	if err != nil {
 		return "", err
 	}
+	fmt.Printf("📂 在 %s 下发现 %d 个 %s 文件\n", inputDir, len(files), suffix)
 
 	if len(files) == 0 {
 		return outputFile, nil
@@ -233,18 +234,53 @@ var symbolPattern = regexp.MustCompile(`^(sh|sz|bj)\d+$`)
 
 func collectFiles(root string, suffix string) ([]string, error) {
 	var files []string
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+
+	var walk func(string) error
+	walk = func(path string) error {
+		entries, err := os.ReadDir(path)
 		if err != nil {
 			return err
 		}
-		if !d.IsDir() && strings.HasSuffix(path, suffix) {
-			fname := filepath.Base(path)
-			symbol := strings.TrimSuffix(fname, suffix)
-			if symbolPattern.MatchString(symbol) {
-				files = append(files, path)
+		for _, entry := range entries {
+			fullPath := filepath.Join(path, entry.Name())
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+
+			// 如果是软链接，获取其指向的真实信息
+			if info.Mode()&os.ModeSymlink != 0 {
+				realPath, err := os.Readlink(fullPath)
+				if err == nil {
+					if !filepath.IsAbs(realPath) {
+						realPath = filepath.Join(path, realPath)
+					}
+					info, err = os.Stat(realPath)
+					if err == nil && info.IsDir() {
+						if err := walk(fullPath); err != nil {
+							return err
+						}
+						continue
+					}
+				}
+			}
+			if info == nil {
+				continue
+			}
+			if info.IsDir() {
+				if err := walk(fullPath); err != nil {
+					return err
+				}
+			} else if strings.HasSuffix(fullPath, suffix) {
+				symbol := strings.TrimSuffix(entry.Name(), suffix)
+				if symbolPattern.MatchString(symbol) {
+					files = append(files, fullPath)
+				}
 			}
 		}
 		return nil
-	})
+	}
+
+	err := walk(root)
 	return files, err
 }

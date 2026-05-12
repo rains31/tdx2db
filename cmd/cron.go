@@ -8,7 +8,10 @@ import (
 	"github.com/jing2uo/tdx2db/workflow"
 )
 
-func Cron(ctx context.Context, dbURI string, min bool) error {
+func Cron(ctx context.Context, dbURI string, min bool, vipdocDir string, targetDate string) error {
+	if vipdocDir != "" {
+		VipdocDir = vipdocDir
+	}
 	db, err := database.NewDB(dbURI)
 	if err != nil {
 		return fmt.Errorf("failed to create database driver: %w", err)
@@ -34,7 +37,7 @@ func Cron(ctx context.Context, dbURI string, min bool) error {
 
 	today := GetToday()
 
-	plan, err := workflow.BuildWorkPlan(db, today)
+	plan, err := workflow.BuildWorkPlan(db, today, min, targetDate)
 	if err != nil {
 		return err
 	}
@@ -48,11 +51,12 @@ func Cron(ctx context.Context, dbURI string, min bool) error {
 	executor := workflow.NewTaskExecutor(db, workflow.GetRegisteredTasks())
 
 	args := &workflow.TaskArgs{
-		Min:       min,
-		TempDir:   TempDir,
-		VipdocDir: VipdocDir,
-		Today:     today,
-		Plan:      plan,
+		Min:        min,
+		TempDir:    TempDir,
+		VipdocDir:  VipdocDir,
+		Today:      today,
+		TargetDate: targetDate,
+		Plan:       plan,
 	}
 
 	taskNames := workflow.GetUpdateTaskNames()

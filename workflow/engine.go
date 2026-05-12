@@ -56,6 +56,7 @@ type TaskArgs struct {
 	VipdocDir  string
 	DayFileDir string
 	Today      time.Time
+	TargetDate string
 	Plan       *WorkPlan
 	Extra      map[string]interface{}
 }

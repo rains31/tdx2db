@@ -115,10 +115,10 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		}
 
 		fmt.Printf("🐌 开始转档分笔数据\n")
-		if err := tdx.DatatoolCreate(dataDir, "tick", GetToday()); err != nil {
+		if err := tdx.DatatoolCreate(dataDir, VipdocDir, "tick", GetToday()); err != nil {
 			return fmt.Errorf("failed to execute DatatoolTickCreate: %w", err)
 		}
-		if err := tdx.DatatoolCreate(dataDir, "min", GetToday()); err != nil {
+		if err := tdx.DatatoolCreate(dataDir, VipdocDir, "min", GetToday()); err != nil {
 			return fmt.Errorf("failed to execute DatatoolMinCreate: %w", err)
 		}
 
@@ -155,7 +155,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		}
 
 		fmt.Printf("🐌 开始转换日线数据\n")
-		if err := tdx.DatatoolCreate(dataDir, "day", GetToday()); err != nil {
+		if err := tdx.DatatoolCreate(dataDir, VipdocDir, "day", GetToday()); err != nil {
 			return fmt.Errorf("failed to execute DatatoolDayCreate: %w", err)
 		}
 
