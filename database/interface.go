@@ -39,4 +39,7 @@ type DataRepository interface {
 
 	GetGbbq() ([]model.GbbqData, error)
 	GetHolidays() ([]time.Time, error)
+
+	Exists(table string, where string, args ...interface{}) (bool, error)
 }
+

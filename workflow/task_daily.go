@@ -63,9 +63,10 @@ func executeUpdateDaily(ctx context.Context, db database.DataRepository, args *T
 	}
 
 	endDate := validDates[len(validDates)-1]
-	if err := tdx.DatatoolCreate(args.TempDir, "day", endDate); err != nil {
+	if err := tdx.DatatoolCreate(args.TempDir, args.VipdocDir, "day", endDate); err != nil {
 		return nil, fmt.Errorf("failed to run DatatoolDayCreate: %w", err)
 	}
+
 
 	return executeDailyImport(ctx, db, args, args.VipdocDir)
 }

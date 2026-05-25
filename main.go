@@ -101,6 +101,8 @@ func main() {
 		dbURI      string
 		dayFileDir string
 		minEnable  bool
+		vipdocDir  string
+		targetDate string
 	)
 
 	var initCmd = &cobra.Command{
@@ -119,7 +121,7 @@ func main() {
 		Example: `  tdx2db cron --dburi 'clickhouse://localhost' --min
   tdx2db cron --dburi 'duckdb://./tdx.db'` + dbURIHelp,
 		RunE: func(c *cobra.Command, args []string) error {
-			return cmd.Cron(ctx, dbURI, minEnable)
+			return cmd.Cron(ctx, dbURI, minEnable, vipdocDir, targetDate)
 		},
 	}
 
@@ -133,6 +135,9 @@ func main() {
 	cronCmd.Flags().StringVar(&dbURI, "dburi", "", dbURIInfo)
 	cronCmd.MarkFlagRequired("dburi")
 	cronCmd.Flags().BoolVar(&minEnable, "min", false, minInfo)
+	cronCmd.Flags().StringVar(&vipdocDir, "vipdocdir", "", "通达信 vipdoc 目录（可选，默认使用缓存目录）")
+	cronCmd.Flags().StringVar(&targetDate, "date", "", "指定同步日期 (YYYYMMDD，可选)")
+
 
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(cronCmd)

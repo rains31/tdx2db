@@ -40,9 +40,10 @@ func executeUpdate1Min(ctx context.Context, db database.DataRepository, args *Ta
 
 	endDate := validDates[len(validDates)-1]
 	fmt.Printf("🐌 开始转换分钟数据\n")
-	if err := tdx.DatatoolCreate(args.TempDir, "min", endDate); err != nil {
+	if err := tdx.DatatoolCreate(args.TempDir, args.VipdocDir, "min", endDate); err != nil {
 		return nil, fmt.Errorf("failed to run DatatoolMinCreate: %w", err)
 	}
+
 
 	fmt.Printf("🐌 开始转换分时数据\n")
 	stock1MinCSV := filepath.Join(args.TempDir, "1min.csv")

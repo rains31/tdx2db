@@ -51,7 +51,7 @@ func executePrepareTic(ctx context.Context, db database.DataRepository, args *Ta
 		return nil, fmt.Errorf("failed to prepare tic data: %w", err)
 	}
 
-	if len(validDates) >= 30 {
+	if len(validDates) >= 30 && args.TargetDate == "" {
 		return nil, fmt.Errorf("分时数据超过30天未更新，请手动补齐后继续")
 	}
 
@@ -72,9 +72,10 @@ func executePrepareTic(ctx context.Context, db database.DataRepository, args *Ta
 
 	endDate := validDates[len(validDates)-1]
 	fmt.Printf("🐌 开始转档分笔数据\n")
-	if err := tdx.DatatoolCreate(args.TempDir, "tick", endDate); err != nil {
+	if err := tdx.DatatoolCreate(args.TempDir, args.VipdocDir, "tick", endDate); err != nil {
 		return nil, fmt.Errorf("failed to run DatatoolTickCreate: %w", err)
 	}
 
 	return &TaskResult{State: StateCompleted, Rows: len(validDates), Message: "tic prepared"}, nil
 }
+

@@ -24,12 +24,20 @@ type pullSource struct {
 // 返回实际成功下载（200）的日期列表，调用方据此决定后续转档/导入。
 func pullDateRange(ctx context.Context, since time.Time, src pullSource, args *TaskArgs) ([]time.Time, error) {
 	var dates []time.Time
-	for d := since.Add(24 * time.Hour); !d.After(args.Today); d = d.Add(24 * time.Hour) {
-		dates = append(dates, d)
+	if args.TargetDate != "" {
+		t, err := time.Parse("20060102", args.TargetDate)
+		if err == nil {
+			dates = []time.Time{t}
+		}
+	} else {
+		for d := since.Add(24 * time.Hour); !d.After(args.Today); d = d.Add(24 * time.Hour) {
+			dates = append(dates, d)
+		}
 	}
 	if len(dates) == 0 {
 		return nil, nil
 	}
+
 
 	if err := os.MkdirAll(src.targetDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create target directory: %w", err)

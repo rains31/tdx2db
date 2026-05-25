@@ -146,3 +146,26 @@ func (d *ClickHouseDriver) GetHolidays() ([]time.Time, error) {
 	}
 	return dates, nil
 }
+
+func (d *ClickHouseDriver) Exists(table string, where string, args ...interface{}) (bool, error) {
+	query := fmt.Sprintf("SELECT 1 FROM %s", table)
+	if where != "" {
+		query += " WHERE " + where
+	}
+	query += " LIMIT 1"
+
+	var dummy int
+	err := d.db.Get(&dummy, query, args...)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		// ClickHouse might return an empty result set error rather than ErrNoRows
+		if strings.Contains(err.Error(), "empty result") {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+

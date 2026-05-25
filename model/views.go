@@ -51,7 +51,12 @@ var (
 	ViewETFBFQ   = DefineView(stockBFQView("v_etf_bfq", "etf"))
 	ViewETFQFQ   = DefineView(adjustedQFQView("v_etf_qfq", "etf", 3))
 	ViewETFHFQ   = DefineView(adjustedHFQView("v_etf_hfq", "etf", 3))
+
+	ViewDailyBFQ = DefineView(unifiedBFQView("v_bfq_daily"))
+	ViewDailyQFQ = DefineView(unifiedQFQView("v_qfq_daily"))
+	ViewDailyHFQ = DefineView(unifiedHFQView("v_hfq_daily"))
 )
+
 
 func stockBFQView(name, class string) ViewDef {
 	sql := fmt.Sprintf(`
@@ -173,3 +178,112 @@ func adjustedQFQView(name, class string, precision int) ViewDef {
 	)
 	return ViewDef{Name: name, DuckDB: sql, ClickHouse: sql}
 }
+
+func unifiedBFQView(name string) ViewDef {
+	sql := fmt.Sprintf(`
+		WITH latest_factors AS (
+			SELECT symbol, argMax(hfq_factor, date) AS latest_hfq
+			FROM %s
+			GROUP BY symbol
+		)
+		SELECT
+			s.symbol     AS symbol,
+			s.date       AS date,
+			s.open       AS open,
+			s.high       AS high,
+			s.low        AS low,
+			s.close      AS close,
+			b.preclose   AS preclose,
+			s.volume     AS volume,
+			s.amount     AS amount,
+			b.turnover   AS turnover,
+			b.floatmv    AS floatmv,
+			b.totalmv    AS totalmv,
+			b.change_pct AS change_pct,
+			b.amplitude  AS amplitude,
+			COALESCE(f.hfq_factor, 1) AS hfq_factor,
+			COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1) AS qfq_factor
+		FROM %s s
+		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index')
+		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
+		LEFT JOIN latest_factors lf ON s.symbol = lf.symbol
+		LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
+	`,
+		TableAdjustFactor.TableName,
+		TableKlineDaily.TableName,
+		TableSymbolClass.TableName,
+		TableAdjustFactor.TableName,
+		TableBasicDaily.TableName,
+	)
+	return ViewDef{Name: name, DuckDB: sql, ClickHouse: sql}
+}
+
+func unifiedHFQView(name string) ViewDef {
+	sql := fmt.Sprintf(`
+		SELECT
+			s.symbol AS symbol,
+			s.date   AS date,
+			ROUND(s.open  * COALESCE(f.hfq_factor, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS open,
+			ROUND(s.high  * COALESCE(f.hfq_factor, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS high,
+			ROUND(s.low   * COALESCE(f.hfq_factor, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS low,
+			ROUND(s.close * COALESCE(f.hfq_factor, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS close,
+			ROUND(b.preclose * COALESCE(f.hfq_factor, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS preclose,
+			s.volume     AS volume,
+			s.amount     AS amount,
+			b.turnover   AS turnover,
+			b.floatmv    AS floatmv,
+			b.totalmv    AS totalmv,
+			b.change_pct AS change_pct,
+			b.amplitude  AS amplitude,
+			COALESCE(f.hfq_factor, 1) AS hfq_factor
+		FROM %s s
+		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index')
+		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
+		LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
+	`,
+		TableKlineDaily.TableName,
+		TableSymbolClass.TableName,
+		TableAdjustFactor.TableName,
+		TableBasicDaily.TableName,
+	)
+	return ViewDef{Name: name, DuckDB: sql, ClickHouse: sql}
+}
+
+func unifiedQFQView(name string) ViewDef {
+	sql := fmt.Sprintf(`
+		WITH latest_factors AS (
+			SELECT symbol, argMax(hfq_factor, date) AS latest_hfq
+			FROM %s
+			GROUP BY symbol
+		)
+		SELECT
+			s.symbol AS symbol,
+			s.date   AS date,
+			ROUND(s.open  * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS open,
+			ROUND(s.high  * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS high,
+			ROUND(s.low   * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS low,
+			ROUND(s.close * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS close,
+			ROUND(b.preclose * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS preclose,
+			s.volume     AS volume,
+			s.amount     AS amount,
+			b.turnover   AS turnover,
+			b.floatmv    AS floatmv,
+			b.totalmv    AS totalmv,
+			b.change_pct AS change_pct,
+			b.amplitude  AS amplitude,
+			COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1) AS qfq_factor
+		FROM %s s
+		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index')
+		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
+		LEFT JOIN latest_factors lf ON s.symbol = lf.symbol
+		LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
+	`,
+		TableAdjustFactor.TableName,
+		TableKlineDaily.TableName,
+		TableSymbolClass.TableName,
+		TableAdjustFactor.TableName,
+		TableBasicDaily.TableName,
+	)
+	return ViewDef{Name: name, DuckDB: sql, ClickHouse: sql}
+}
+

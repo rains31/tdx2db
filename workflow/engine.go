@@ -56,9 +56,11 @@ type TaskArgs struct {
 	VipdocDir  string
 	DayFileDir string
 	Today      time.Time
+	TargetDate string
 	Plan       *WorkPlan
 	Extra      map[string]interface{}
 }
+
 
 // TaskExecutor manages and executes tasks with dependency resolution
 type TaskExecutor struct {
