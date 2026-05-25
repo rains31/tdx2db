@@ -60,14 +60,17 @@ func datatoolExec(cacheDir, vipdocDir, subCommand string, endDate time.Time) err
 	}
 
 	vipdocInCache := filepath.Join(cacheDir, "vipdoc")
-	// 清理旧的链接或目录
-	_ = os.Remove(vipdocInCache)
-	
-	if err := os.Symlink(absVipdocDir, vipdocInCache); err != nil {
-		return fmt.Errorf("failed to create symlink for vipdoc: %w", err)
+	if absVipdocDir != vipdocInCache {
+		// 清理旧的链接或目录
+		_ = os.Remove(vipdocInCache)
+		
+		if err := os.Symlink(absVipdocDir, vipdocInCache); err != nil {
+			return fmt.Errorf("failed to create symlink for vipdoc: %w", err)
+		}
 	}
 
 	cmd := exec.Command(toolPath, subCommand, "create", startDateStr, endDateStr)
+
 	cmd.Dir = cacheDir
 
 	fmt.Printf("🚀 正在转档 %s 数据... ", subCommand)

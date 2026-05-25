@@ -201,8 +201,8 @@ func unifiedBFQView(name string) ViewDef {
 			b.totalmv    AS totalmv,
 			b.change_pct AS change_pct,
 			b.amplitude  AS amplitude,
-			COALESCE(f.hfq_factor, 1) AS hfq_factor,
-			COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1) AS qfq_factor
+			CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END AS hfq_factor,
+			CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END / CASE WHEN COALESCE(lf.latest_hfq, 0) <= 0 THEN 1.0 ELSE lf.latest_hfq END AS qfq_factor
 		FROM %s s
 		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index')
 		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
@@ -223,11 +223,11 @@ func unifiedHFQView(name string) ViewDef {
 		SELECT
 			s.symbol AS symbol,
 			s.date   AS date,
-			ROUND(s.open  * COALESCE(f.hfq_factor, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS open,
-			ROUND(s.high  * COALESCE(f.hfq_factor, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS high,
-			ROUND(s.low   * COALESCE(f.hfq_factor, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS low,
-			ROUND(s.close * COALESCE(f.hfq_factor, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS close,
-			ROUND(b.preclose * COALESCE(f.hfq_factor, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS preclose,
+			ROUND(s.open  * CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END, CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS open,
+			ROUND(s.high  * CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END, CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS high,
+			ROUND(s.low   * CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END, CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS low,
+			ROUND(s.close * CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END, CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS close,
+			ROUND(b.preclose * CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END, CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS preclose,
 			s.volume     AS volume,
 			s.amount     AS amount,
 			b.turnover   AS turnover,
@@ -235,7 +235,7 @@ func unifiedHFQView(name string) ViewDef {
 			b.totalmv    AS totalmv,
 			b.change_pct AS change_pct,
 			b.amplitude  AS amplitude,
-			COALESCE(f.hfq_factor, 1) AS hfq_factor
+			CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END AS hfq_factor
 		FROM %s s
 		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index')
 		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
@@ -259,11 +259,11 @@ func unifiedQFQView(name string) ViewDef {
 		SELECT
 			s.symbol AS symbol,
 			s.date   AS date,
-			ROUND(s.open  * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS open,
-			ROUND(s.high  * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS high,
-			ROUND(s.low   * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS low,
-			ROUND(s.close * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS close,
-			ROUND(b.preclose * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS preclose,
+			ROUND(s.open  * CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END / CASE WHEN COALESCE(lf.latest_hfq, 0) <= 0 THEN 1.0 ELSE lf.latest_hfq END, CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS open,
+			ROUND(s.high  * CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END / CASE WHEN COALESCE(lf.latest_hfq, 0) <= 0 THEN 1.0 ELSE lf.latest_hfq END, CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS high,
+			ROUND(s.low   * CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END / CASE WHEN COALESCE(lf.latest_hfq, 0) <= 0 THEN 1.0 ELSE lf.latest_hfq END, CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS low,
+			ROUND(s.close * CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END / CASE WHEN COALESCE(lf.latest_hfq, 0) <= 0 THEN 1.0 ELSE lf.latest_hfq END, CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS close,
+			ROUND(b.preclose * CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END / CASE WHEN COALESCE(lf.latest_hfq, 0) <= 0 THEN 1.0 ELSE lf.latest_hfq END, CASE WHEN sc.class = 'etf' THEN 3 ELSE 2 END) AS preclose,
 			s.volume     AS volume,
 			s.amount     AS amount,
 			b.turnover   AS turnover,
@@ -271,7 +271,7 @@ func unifiedQFQView(name string) ViewDef {
 			b.totalmv    AS totalmv,
 			b.change_pct AS change_pct,
 			b.amplitude  AS amplitude,
-			COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1) AS qfq_factor
+			CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END / CASE WHEN COALESCE(lf.latest_hfq, 0) <= 0 THEN 1.0 ELSE lf.latest_hfq END AS qfq_factor
 		FROM %s s
 		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index')
 		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
@@ -286,4 +286,5 @@ func unifiedQFQView(name string) ViewDef {
 	)
 	return ViewDef{Name: name, DuckDB: sql, ClickHouse: sql}
 }
+
 
