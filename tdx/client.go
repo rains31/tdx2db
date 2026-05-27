@@ -65,6 +65,7 @@ func (c *OnlineClient) connectToHosts(hosts []struct {
 	type candidate struct {
 		addr string
 		dur  time.Duration
+		conn net.Conn
 	}
 	var candidates []candidate
 	for _, h := range hosts {
@@ -74,19 +75,25 @@ func (c *OnlineClient) connectToHosts(hosts []struct {
 		if err != nil {
 			continue
 		}
-		_ = conn.Close()
-		candidates = append(candidates, candidate{addr: addr, dur: time.Since(start)})
+		candidates = append(candidates, candidate{
+			addr: addr,
+			dur:  time.Since(start),
+			conn: conn,
+		})
 	}
 	if len(candidates) == 0 {
 		return fmt.Errorf("no available TDX online server")
 	}
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].dur < candidates[j].dur })
 
-	conn, err := net.DialTimeout("tcp", candidates[0].addr, 5*time.Second)
-	if err != nil {
-		return fmt.Errorf("failed to connect TDX server %s: %w", candidates[0].addr, err)
+	// 最快的那个连接直接保留使用，无需二次 Dial
+	c.conn = candidates[0].conn
+
+	// 关闭其余较慢的连接
+	for i := 1; i < len(candidates); i++ {
+		_ = candidates[i].conn.Close()
 	}
-	c.conn = conn
+
 	return nil
 }
 
