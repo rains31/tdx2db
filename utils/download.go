@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,7 +28,7 @@ type DownloadOptions struct {
 	Headers      map[string]string
 	MaxAttempts  int
 	RetryBackoff time.Duration
-	Timeout      time.Duration // 每次尝试的 http.Client 超时; 0 = 不限
+	Timeout      time.Duration // 每次尝试 of http.Client 超时; 0 = 不限
 }
 
 // Download 封装下载任务
@@ -286,3 +287,135 @@ func (d *Download) singleThreadDownload(ctx context.Context) (int, error) {
 
 	return resp.StatusCode, nil
 }
+
+// 创建一个带超时的自定义客户端
+var downloadClient = &http.Client{
+	Transport: &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ResponseHeaderTimeout: 10 * time.Second,
+	},
+}
+
+// DownloadFileWithResume 下载文件并支持断点续传和自动重试
+func DownloadFileWithResume(url string, destPath string) error {
+	maxRetries := 10
+	var lastErr error
+
+	for i := 0; i < maxRetries; i++ {
+		if i > 0 {
+			fmt.Printf("🔄 发现卡顿或断线，正在进行第 %d 次重试... (等待 3 秒)\n", i)
+			time.Sleep(3 * time.Second)
+		}
+
+		err := downloadAttempt(url, destPath)
+		if err == nil {
+			return nil
+		}
+
+		// 404 错误直接熔断，不重试
+		if err.Error() == "HTTP 404" {
+			return err
+		}
+
+		lastErr = err
+		fmt.Printf("⚠️  下载中断: %v\n", err)
+	}
+
+	return fmt.Errorf("在 %d 次重试后仍然失败: %w", maxRetries, lastErr)
+}
+
+func downloadAttempt(url string, destPath string) error {
+	partPath := destPath + ".part"
+	var startBytes int64 = 0
+
+	if stat, err := os.Stat(partPath); err == nil {
+		startBytes = stat.Size()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	if startBytes > 0 {
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", startBytes))
+	}
+
+	resp, err := downloadClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	if startBytes > 0 && resp.StatusCode == http.StatusOK {
+		startBytes = 0
+	}
+
+	out, err := os.OpenFile(partPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	done := make(chan struct{})
+	lastPos := startBytes
+	currentPos := startBytes
+
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				if currentPos <= lastPos {
+					fmt.Println("🛑 检测到传输僵死（10秒无流量），正在强制重连...")
+					cancel()
+					return
+				}
+				lastPos = currentPos
+			}
+		}
+	}()
+
+	progressWriter := &progressTrackingWriter{
+		Writer: out,
+		OnWrite: func(n int) {
+			currentPos += int64(n)
+		},
+	}
+
+	_, err = io.Copy(progressWriter, resp.Body)
+	close(done)
+
+	if err != nil {
+		return fmt.Errorf("传输失败: %w", err)
+	}
+
+	return os.Rename(partPath, destPath)
+}
+
+type progressTrackingWriter struct {
+	io.Writer
+	OnWrite func(int)
+}
+
+func (w *progressTrackingWriter) Write(p []byte) (n int, err error) {
+	n, err = w.Writer.Write(p)
+	if n > 0 {
+		w.OnWrite(n)
+	}
+	return n, err
+}
+

@@ -75,6 +75,16 @@ func (c *OnlineClient) connectToHosts(hosts []struct {
 		if err != nil {
 			continue
 		}
+
+		// 进行应用层登录包验证，确保该服务器不仅 TCP 端口开着，而且实际可用
+		tc := &OnlineClient{conn: conn}
+		_ = conn.SetDeadline(time.Now().Add(time.Second))
+		if err := tc.LoginStandard(); err != nil {
+			_ = conn.Close()
+			continue
+		}
+		_ = conn.SetDeadline(time.Time{}) // 清除超时设置
+
 		candidates = append(candidates, candidate{
 			addr: addr,
 			dur:  time.Since(start),
@@ -86,7 +96,7 @@ func (c *OnlineClient) connectToHosts(hosts []struct {
 	}
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].dur < candidates[j].dur })
 
-	// 最快的那个连接直接保留使用，无需二次 Dial
+	// 最快的那个可用连接直接保留使用，无需二次 Dial
 	c.conn = candidates[0].conn
 
 	// 关闭其余较慢的连接
