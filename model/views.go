@@ -84,7 +84,7 @@ func stockBFQView(name, class string) ViewDef {
 			COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1) AS qfq_factor
 		FROM %s s
 		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class = '%s'
-		ASOF LEFT JOIN %s f ON s.symbol = f.symbol AND s.date >= f.date
+		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
 		LEFT JOIN latest_factors lf ON s.symbol = lf.symbol
 		LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
 	`,
@@ -118,7 +118,7 @@ func adjustedHFQView(name, class string, precision int) ViewDef {
 			COALESCE(f.hfq_factor, 1) AS hfq_factor
 		FROM %s s
 		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class = '%s'
-		ASOF LEFT JOIN %s f ON s.symbol = f.symbol AND s.date >= f.date
+		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
 		LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
 	`,
 		precision,
@@ -160,7 +160,7 @@ func adjustedQFQView(name, class string, precision int) ViewDef {
 			COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1) AS qfq_factor
 		FROM %s s
 		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class = '%s'
-		ASOF LEFT JOIN %s f ON s.symbol = f.symbol AND s.date >= f.date
+		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
 		LEFT JOIN latest_factors lf ON s.symbol = lf.symbol
 		LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
 	`,
@@ -205,7 +205,7 @@ func unifiedBFQView(name string) ViewDef {
 			CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END / CASE WHEN COALESCE(lf.latest_hfq, 0) <= 0 THEN 1.0 ELSE lf.latest_hfq END AS qfq_factor
 		FROM %s s
 		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index')
-		ASOF LEFT JOIN %s f ON s.symbol = f.symbol AND s.date >= f.date
+		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
 		LEFT JOIN latest_factors lf ON s.symbol = lf.symbol
 		LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
 	`,
@@ -238,7 +238,7 @@ func unifiedHFQView(name string) ViewDef {
 			CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END AS hfq_factor
 		FROM %s s
 		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index')
-		ASOF LEFT JOIN %s f ON s.symbol = f.symbol AND s.date >= f.date
+		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
 		LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
 	`,
 		TableKlineDaily.TableName,
@@ -274,7 +274,7 @@ func unifiedQFQView(name string) ViewDef {
 			CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END / CASE WHEN COALESCE(lf.latest_hfq, 0) <= 0 THEN 1.0 ELSE lf.latest_hfq END AS qfq_factor
 		FROM %s s
 		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index')
-		ASOF LEFT JOIN %s f ON s.symbol = f.symbol AND s.date >= f.date
+		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
 		LEFT JOIN latest_factors lf ON s.symbol = lf.symbol
 		LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
 	`,
