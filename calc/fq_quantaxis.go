@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sort"
+	"time"
 
 	"github.com/jing2uo/tdx2db/database"
 	"github.com/jing2uo/tdx2db/model"
@@ -12,7 +14,8 @@ import (
 
 // FactorContext 处理上下文
 type FactorContext struct {
-	DB database.DataRepository
+	DB        database.DataRepository
+	GbbqIndex GbbqIndex
 }
 
 // ExportFactorsToCSV 导出后复权因子（每天一条记录，和日线对齐）
@@ -21,6 +24,12 @@ func ExportFactorsToCSV(
 	db database.DataRepository,
 	csvPath string,
 ) (int, error) {
+	gbbqData, err := db.GetGbbq()
+	if err != nil {
+		return 0, fmt.Errorf("failed to query gbbq: %w", err)
+	}
+	gbbqIndex := buildGbbqIndex(gbbqData)
+
 	symbols, err := db.GetSymbolsByClass(model.ClassStock, model.ClassETF)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query symbols: %w", err)
@@ -37,7 +46,8 @@ func ExportFactorsToCSV(
 	defer cw.Close()
 
 	fctx := &FactorContext{
-		DB: db,
+		DB:        db,
+		GbbqIndex: gbbqIndex,
 	}
 
 	pipeline := utils.NewPipeline[string, model.Factor]()
@@ -76,6 +86,68 @@ func processFactorSymbol(fctx *FactorContext, symbol string) ([]model.Factor, er
 	}
 	if len(basics) == 0 {
 		return nil, nil
+	}
+
+	gbbqs := getGbbqBySymbol(fctx.GbbqIndex, symbol)
+	lastDate := basics[len(basics)-1].Date
+
+	// 找出未来可能影响复权因子的 GBBQ 事件 (Category 1 和 11)
+	var futureEvents []model.GbbqData
+	for _, item := range gbbqs {
+		if item.Date.After(lastDate) && (item.Category == 1 || (item.Category == 11 && item.C3 > 0)) {
+			futureEvents = append(futureEvents, item)
+		}
+	}
+
+	if len(futureEvents) > 0 {
+		eventsByDate := make(map[string][]model.GbbqData)
+		var futureDates []time.Time
+		for _, item := range futureEvents {
+			dStr := item.Date.Format("2006-01-02")
+			if _, ok := eventsByDate[dStr]; !ok {
+				futureDates = append(futureDates, item.Date)
+			}
+			eventsByDate[dStr] = append(eventsByDate[dStr], item)
+		}
+
+		sort.Slice(futureDates, func(i, j int) bool {
+			return futureDates[i].Before(futureDates[j])
+		})
+
+		prevClose := basics[len(basics)-1].Close
+		for _, fd := range futureDates {
+			dStr := fd.Format("2006-01-02")
+			items := eventsByDate[dStr]
+
+			xdxr := &xdxrInfo{}
+			for _, item := range items {
+				if item.Category == 1 {
+					xdxr.Fenhong += item.C1
+					xdxr.Songzhuangu += item.C3
+					xdxr.Peigu += item.C4
+					if item.C2 > 0 {
+						xdxr.Peigujia = item.C2
+					}
+				} else if item.Category == 11 && item.C3 > 0 {
+					if xdxr.Splitc3 > 0 {
+						xdxr.Splitc3 *= item.C3
+					} else {
+						xdxr.Splitc3 = item.C3
+					}
+				}
+			}
+
+			preClose := calculatePreClosePrice(prevClose, xdxr)
+
+			dummy := model.BasicDaily{
+				Symbol:   symbol,
+				Date:     fd,
+				Close:    prevClose,
+				PreClose: preClose,
+			}
+			basics = append(basics, dummy)
+			prevClose = dummy.Close
+		}
 	}
 
 	return calculateFullHfq(basics), nil
