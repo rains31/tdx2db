@@ -117,18 +117,30 @@ func BuildWorkPlan(db database.DataRepository, today time.Time, min bool, target
 			plan.NeedDaily = dailyLatest.Before(plan.LastTradingDay)
 		}
 
-		// 检查复权因子是否存在
+		// 检查复权因子是否存在 (需覆盖向前 5 个未来交易日)
 		needFactorToday := false
+
+		// 找出 LastTradingDay 之后的第 5 个未来交易日
+		var futureDates []time.Time
+		curr := plan.LastTradingDay
+		for len(futureDates) < 5 {
+			curr = curr.AddDate(0, 0, 1)
+			if plan.Calendar.IsTradingDay(curr) {
+				futureDates = append(futureDates, curr)
+			}
+		}
+		targetLatestFactorDate := futureDates[4]
+
 		if targetDate != "" {
-			dateStr := plan.LastTradingDay.Format("2006-01-02")
-			nextDayStr := plan.LastTradingDay.AddDate(0, 0, 1).Format("2006-01-02")
+			dateStr := targetLatestFactorDate.Format("2006-01-02")
+			nextDayStr := targetLatestFactorDate.AddDate(0, 0, 1).Format("2006-01-02")
 			exists, err := db.Exists(model.TableAdjustFactor.TableName, "date >= ? AND date < ?", dateStr, nextDayStr)
 			if err != nil {
 				return nil, fmt.Errorf("failed to check factor data existence: %w", err)
 			}
 			needFactorToday = !exists
 		} else {
-			needFactorToday = factorLatest.Before(plan.LastTradingDay)
+			needFactorToday = factorLatest.Before(targetLatestFactorDate)
 		}
 
 		plan.NeedFactor = plan.NeedDaily || needFactorToday
