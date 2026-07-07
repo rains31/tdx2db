@@ -31,7 +31,7 @@ func (p *WorkPlan) AnyNeeded() bool {
 }
 
 // BuildWorkPlan 读取交易日历与各表最新日期，推导本次 cron 要做什么。
-func BuildWorkPlan(db database.DataRepository, today time.Time, min bool, targetDate string) (*WorkPlan, error) {
+func BuildWorkPlan(db database.DataRepository, today time.Time, min bool, targetDate string, missingOnly bool, force bool) (*WorkPlan, error) {
 	holidays, err := db.GetHolidays()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load holidays: %w", err)
@@ -77,31 +77,92 @@ func BuildWorkPlan(db database.DataRepository, today time.Time, min bool, target
 		return nil, fmt.Errorf("failed to get latest daily date: %w", err)
 	}
 
-	// 增量同步逻辑：日线
-	plan.NeedDaily = dailyLatest.Before(plan.LastTradingDay)
-	plan.NeedGbbq = plan.NeedDaily
-	plan.NeedBasic = plan.NeedDaily
-	plan.NeedFactor = plan.NeedDaily
-	plan.NeedHolidays = plan.NeedDaily
+	factorLatest, err := db.GetLatestDate(model.TableAdjustFactor.TableName, "date")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest factor date: %w", err)
+	}
 
-	if min {
-		if targetDate != "" {
-			// 如果指定了日期，检查该日期是否已经有数据
+	now := time.Now().Local()
+	nowTime := now.Hour()*100 + now.Minute()
+
+	// 1. 收盘后更新是强制性的 (15:00 以后的运行)
+	if targetDate == "" && nowTime >= 1500 {
+		plan.NeedDaily = true
+		plan.NeedGbbq = true
+		plan.NeedBasic = true
+		plan.NeedFactor = true
+		plan.NeedHolidays = true
+		plan.NeedMin = min
+	} else if targetDate == "" && nowTime < 930 {
+		// 2. 开盘前更新只看 gbbq (09:30 之前的运行)
+		plan.NeedDaily = false
+		plan.NeedMin = false
+		plan.NeedGbbq = true
+		plan.NeedBasic = true
+		plan.NeedFactor = true
+		plan.NeedHolidays = true
+	} else {
+		// 3. 其它时间 (日中或指定日期补数)
+		if force {
+			plan.NeedDaily = true
+		} else if targetDate != "" {
 			dateStr := plan.LastTradingDay.Format("2006-01-02")
 			nextDayStr := plan.LastTradingDay.AddDate(0, 0, 1).Format("2006-01-02")
-			exists, err := db.Exists(model.TableKline1Min.TableName,
-				"datetime >= ? AND datetime < ?", dateStr, nextDayStr)
+			exists, err := db.Exists(model.TableKlineDaily.TableName, "date >= ? AND date < ?", dateStr, nextDayStr)
 			if err != nil {
-				return nil, fmt.Errorf("failed to check minute data existence: %w", err)
+				return nil, fmt.Errorf("failed to check daily data existence: %w", err)
 			}
-			plan.NeedMin = !exists
+			plan.NeedDaily = !exists
 		} else {
-			minLatest, err := db.GetLatestDate(model.TableKline1Min.TableName, "datetime")
+			plan.NeedDaily = dailyLatest.Before(plan.LastTradingDay)
+		}
+
+		// 检查复权因子是否存在
+		needFactorToday := false
+		if targetDate != "" {
+			dateStr := plan.LastTradingDay.Format("2006-01-02")
+			nextDayStr := plan.LastTradingDay.AddDate(0, 0, 1).Format("2006-01-02")
+			exists, err := db.Exists(model.TableAdjustFactor.TableName, "date >= ? AND date < ?", dateStr, nextDayStr)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get latest minute date: %w", err)
+				return nil, fmt.Errorf("failed to check factor data existence: %w", err)
 			}
-			// 仅当分钟线落后于最近交易日时才触发更新
-			plan.NeedMin = minLatest.Before(plan.LastTradingDay)
+			needFactorToday = !exists
+		} else {
+			needFactorToday = factorLatest.Before(plan.LastTradingDay)
+		}
+
+		plan.NeedFactor = plan.NeedDaily || needFactorToday
+		plan.NeedGbbq = plan.NeedDaily || needFactorToday
+		plan.NeedHolidays = plan.NeedGbbq
+		plan.NeedBasic = plan.NeedDaily || needFactorToday
+
+		if min {
+			if force {
+				plan.NeedMin = true
+			} else if targetDate != "" {
+				if missingOnly {
+					plan.NeedMin = true
+				} else {
+					dateStr := plan.LastTradingDay.Format("2006-01-02")
+					nextDayStr := plan.LastTradingDay.AddDate(0, 0, 1).Format("2006-01-02")
+					exists, err := db.Exists(model.TableKline1Min.TableName,
+						"datetime >= ? AND datetime < ?", dateStr, nextDayStr)
+					if err != nil {
+						return nil, fmt.Errorf("failed to check minute data existence: %w", err)
+					}
+					plan.NeedMin = !exists
+				}
+			} else {
+				if missingOnly {
+					plan.NeedMin = true
+				} else {
+					minLatest, err := db.GetLatestDate(model.TableKline1Min.TableName, "datetime")
+					if err != nil {
+						return nil, fmt.Errorf("failed to get latest minute date: %w", err)
+					}
+					plan.NeedMin = minLatest.Before(plan.LastTradingDay)
+				}
+			}
 		}
 	}
 
