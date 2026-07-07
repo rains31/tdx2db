@@ -19,6 +19,12 @@ const (
 	recordSize = 32
 )
 
+// cnLoc 是中国标准时间 (Asia/Shanghai, UTC+8)。
+// 通达信数据文件中的时间字段不含时区信息，且所有 A 股行情均为北京时间，
+// 因此解析时必须显式使用 CST 而非 time.Local，避免在 UTC 服务器上产生 8 小时偏移。
+var cnLoc = time.FixedZone("CST", 8*3600)
+
+// ConvertFilesToCSV 转换 TDX 文件到 CSV
 func ConvertFilesToCSV(ctx context.Context, inputDir string, outputFile string, suffix string) (string, error) {
 	switch suffix {
 	case ".day":
@@ -208,7 +214,7 @@ func parseDate(d uint32) (time.Time, error) {
 	if year < 1900 || month < 1 || month > 12 || day < 1 || day > 31 {
 		return time.Time{}, fmt.Errorf("invalid date")
 	}
-	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local), nil
+	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, cnLoc), nil
 }
 
 func parseDayVolume(volRaw, reserved uint32) int64 {
@@ -234,10 +240,16 @@ func parseDateTime(dateRaw, timeRaw uint16) (time.Time, error) {
 	hour := int(timeRaw) / 60
 	minute := int(timeRaw) % 60
 
+	// datatool 闭源二进制在某些调用路径下会将 CST 交易时间 (9-15)
+	// 写入为 +8h 偏移 (17-23)。仅在明显超出交易时段时才回拨。
+	if hour >= 16 {
+		hour -= 8
+	}
+
 	if month < 1 || month > 12 || day < 1 || day > 31 {
 		return time.Time{}, fmt.Errorf("invalid date")
 	}
-	return time.Date(year, time.Month(month), day, hour, minute, 0, 0, time.Local), nil
+	return time.Date(year, time.Month(month), day, hour, minute, 0, 0, cnLoc), nil
 }
 
 var symbolPattern = regexp.MustCompile(`^(sh|sz|bj)\d+$`)
