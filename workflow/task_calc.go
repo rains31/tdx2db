@@ -59,7 +59,7 @@ func executeCalcFactor(ctx context.Context, db database.DataRepository, args *Ta
 	fmt.Println("📟 计算股票复权因子")
 	factorCSV := filepath.Join(args.TempDir, "factor.csv")
 
-	factorCount, err := calc.ExportFactorsToCSV(ctx, db, factorCSV)
+	factorCount, err := calc.ExportFactorsToCSV(ctx, db, factorCSV, args.Force)
 	if err != nil {
 		return nil, fmt.Errorf("failed to export factor to csv: %w", err)
 	}
@@ -69,7 +69,9 @@ func executeCalcFactor(ctx context.Context, db database.DataRepository, args *Ta
 		return &TaskResult{State: StateSkipped, Message: "no new factor data"}, nil
 	}
 
-	db.TruncateTable(model.TableAdjustFactor)
+	if args.Force {
+		db.TruncateTable(model.TableAdjustFactor)
+	}
 	if err := db.ImportAdjustFactors(factorCSV); err != nil {
 		return nil, fmt.Errorf("failed to append factor data: %w", err)
 	}
