@@ -146,13 +146,8 @@ func BuildWorkPlan(db database.DataRepository, today time.Time, min bool, target
 			needFactorToday = factorLatest.Before(targetLatestFactorDate)
 		}
 
-		// 只有在明确需要更新 GBBQ、或者有新日线要入库、或者未来交易日的复权因子缺失时，才运行因子重算
-		plan.NeedFactor = plan.NeedGbbq || plan.NeedDaily || needFactorToday
-		
-		// 如果确定运行了 factor 计算，我们也顺便需要 GBBQ 数据
-		if plan.NeedFactor {
-			plan.NeedGbbq = true
-		}
+		// 只有在明确需要更新 GBBQ、或者未来交易日的复权因子缺失时，才运行因子重算 (不随 NeedDaily 联动)
+		plan.NeedFactor = plan.NeedGbbq || needFactorToday
 
 		plan.NeedHolidays = plan.NeedGbbq
 		plan.NeedBasic = plan.NeedDaily || plan.NeedFactor
