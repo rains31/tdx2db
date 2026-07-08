@@ -31,7 +31,7 @@ func (p *WorkPlan) AnyNeeded() bool {
 }
 
 // BuildWorkPlan 读取交易日历与各表最新日期，推导本次 cron 要做什么。
-func BuildWorkPlan(db database.DataRepository, today time.Time, min bool, targetDate string, missingOnly bool, force bool) (*WorkPlan, error) {
+func BuildWorkPlan(db database.DataRepository, today time.Time, min bool, targetDate string, missingOnly bool, force bool, gbbq bool) (*WorkPlan, error) {
 	holidays, err := db.GetHolidays()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load holidays: %w", err)
@@ -117,7 +117,10 @@ func BuildWorkPlan(db database.DataRepository, today time.Time, min bool, target
 			plan.NeedDaily = dailyLatest.Before(plan.LastTradingDay)
 		}
 
-		// 检查复权因子是否存在 (需覆盖向前 5 个未来交易日)
+		// GBBQ 是否强制执行，通过独立的 gbbq 参数或 context 逻辑控制
+		plan.NeedGbbq = gbbq
+		
+		// 检查复权因子是否需要重算 (如果没有显式要求 gbbq 且没有需要补的因子，就不重算)
 		needFactorToday := false
 
 		// 找出 LastTradingDay 之后的第 5 个未来交易日
@@ -143,10 +146,16 @@ func BuildWorkPlan(db database.DataRepository, today time.Time, min bool, target
 			needFactorToday = factorLatest.Before(targetLatestFactorDate)
 		}
 
-		plan.NeedFactor = plan.NeedDaily || needFactorToday
-		plan.NeedGbbq = plan.NeedDaily || needFactorToday
+		// 只有在明确需要更新 GBBQ、或者有新日线要入库、或者未来交易日的复权因子缺失时，才运行因子重算
+		plan.NeedFactor = plan.NeedGbbq || plan.NeedDaily || needFactorToday
+		
+		// 如果确定运行了 factor 计算，我们也顺便需要 GBBQ 数据
+		if plan.NeedFactor {
+			plan.NeedGbbq = true
+		}
+
 		plan.NeedHolidays = plan.NeedGbbq
-		plan.NeedBasic = plan.NeedDaily || needFactorToday
+		plan.NeedBasic = plan.NeedDaily || plan.NeedFactor
 
 		if min {
 			if force {

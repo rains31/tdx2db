@@ -98,11 +98,14 @@ func main() {
 	}
 
 	var (
-		dbURI      string
-		dayFileDir string
-		minEnable  bool
-		vipdocDir  string
-		targetDate string
+		dbURI       string
+		dayFileDir  string
+		minEnable   bool
+		vipdocDir   string
+		targetDate  string
+		missingOnly bool
+		force       bool
+		gbbqEnable  bool
 	)
 
 	var initCmd = &cobra.Command{
@@ -121,7 +124,7 @@ func main() {
 		Example: `  tdx2db cron --dburi 'clickhouse://localhost' --min
   tdx2db cron --dburi 'duckdb://./tdx.db'` + dbURIHelp,
 		RunE: func(c *cobra.Command, args []string) error {
-			return cmd.Cron(ctx, dbURI, minEnable, vipdocDir, targetDate)
+			return cmd.Cron(ctx, dbURI, minEnable, vipdocDir, targetDate, missingOnly, force, gbbqEnable)
 		},
 	}
 
@@ -137,11 +140,32 @@ func main() {
 	cronCmd.Flags().BoolVar(&minEnable, "min", false, minInfo)
 	cronCmd.Flags().StringVar(&vipdocDir, "vipdocdir", "", "通达信 vipdoc 目录（可选，默认使用缓存目录）")
 	cronCmd.Flags().StringVar(&targetDate, "date", "", "指定同步日期 (YYYYMMDD，可选)")
+	cronCmd.Flags().BoolVar(&missingOnly, "missing-only", false, "仅补全缺失数据，不重复导入已存在的数据")
+	cronCmd.Flags().BoolVar(&force, "force", false, "强制覆盖：先删后导，以 TDX 数据为准（仅当指定 --date 时有效）")
+	cronCmd.Flags().BoolVar(&gbbqEnable, "gbbq", false, "强制更新/下载 gbbq 股本变迁数据（即使指定了 --force，默认也为 false）")
 
+	// FillDaily command
+	var fillVipdocDir string
+	var fillDailyCmd = &cobra.Command{
+		Use:   "fill-daily",
+		Short: "用完整 vipdoc 目录一次性补全所有缺失的日线数据",
+		Long: `扫描 vipdoc 目录下所有 .day 文件生成完整 CSV，通过临时表精准插入缺失的 (date, symbol) 组合。
+
+示例:
+  tdx2db fill-daily --dburi 'clickhouse://...' --vipdocdir ~/workspace/tdx_data/vipdoc`,
+		RunE: func(c *cobra.Command, args []string) error {
+			return cmd.FillDaily(ctx, dbURI, fillVipdocDir)
+		},
+	}
+	fillDailyCmd.Flags().StringVar(&dbURI, "dburi", "", dbURIInfo)
+	fillDailyCmd.MarkFlagRequired("dburi")
+	fillDailyCmd.Flags().StringVar(&fillVipdocDir, "vipdocdir", "", "包含 sh/lday, sz/lday, bj/lday 的 vipdoc 根目录")
+	fillDailyCmd.MarkFlagRequired("vipdocdir")
 
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(cronCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(fillDailyCmd)
 
 	cobra.OnFinalize(func() {
 		os.RemoveAll(cmd.TempDir)

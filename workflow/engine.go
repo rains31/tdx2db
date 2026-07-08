@@ -51,14 +51,17 @@ type Task struct {
 }
 
 type TaskArgs struct {
-	Min        bool
-	TempDir    string
-	VipdocDir  string
-	DayFileDir string
-	Today      time.Time
-	TargetDate string
-	Plan       *WorkPlan
-	Extra      map[string]interface{}
+	Min         bool
+	MissingOnly bool
+	Force       bool
+	Gbbq        bool
+	TempDir     string
+	VipdocDir   string
+	DayFileDir  string
+	Today       time.Time
+	TargetDate  string
+	Plan        *WorkPlan
+	Extra       map[string]interface{}
 }
 
 

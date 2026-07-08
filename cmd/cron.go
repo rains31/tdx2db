@@ -8,7 +8,7 @@ import (
 	"github.com/jing2uo/tdx2db/workflow"
 )
 
-func Cron(ctx context.Context, dbURI string, min bool, vipdocDir string, targetDate string) error {
+func Cron(ctx context.Context, dbURI string, min bool, vipdocDir string, targetDate string, missingOnly bool, force bool, gbbq bool) error {
 	if vipdocDir != "" {
 		VipdocDir = vipdocDir
 	}
@@ -38,7 +38,7 @@ func Cron(ctx context.Context, dbURI string, min bool, vipdocDir string, targetD
 
 	today := GetToday()
 
-	plan, err := workflow.BuildWorkPlan(db, today, min, targetDate)
+	plan, err := workflow.BuildWorkPlan(db, today, min, targetDate, missingOnly, force, gbbq)
 	if err != nil {
 		return err
 	}
@@ -52,12 +52,15 @@ func Cron(ctx context.Context, dbURI string, min bool, vipdocDir string, targetD
 	executor := workflow.NewTaskExecutor(db, workflow.GetRegisteredTasks())
 
 	args := &workflow.TaskArgs{
-		Min:        min,
-		TempDir:    TempDir,
-		VipdocDir:  VipdocDir,
-		Today:      today,
-		TargetDate: targetDate,
-		Plan:       plan,
+		Min:         min,
+		MissingOnly: missingOnly,
+		Force:       force,
+		Gbbq:        gbbq,
+		TempDir:     TempDir,
+		VipdocDir:   VipdocDir,
+		Today:       today,
+		TargetDate:  targetDate,
+		Plan:        plan,
 	}
 
 	taskNames := workflow.GetUpdateTaskNames()
