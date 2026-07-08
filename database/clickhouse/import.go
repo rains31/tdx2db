@@ -80,6 +80,52 @@ func (d *ClickHouseDriver) ImportKline1Min(path string) error {
 	return d.ImportCSV(model.TableKline1Min, path)
 }
 
+// QueryExisting1Min returns existing (date:symbol:minute) pairs as "date|symbol|HH:MM" keys
+func (d *ClickHouseDriver) QueryExisting1Min(date time.Time) (map[string]bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	dateStr := date.Format("2006-01-02")
+	query := fmt.Sprintf(
+		"SELECT DISTINCT symbol, formatDateTime(datetime, '%%H:%%M') FROM %s WHERE toDate(datetime) = toDate('%s')",
+		model.TableKline1Min.TableName, dateStr,
+	)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", d.httpImportUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+	q := req.URL.Query()
+	q.Add("query", query)
+	if d.database != "" {
+		q.Add("database", d.database)
+	}
+	req.URL.RawQuery = q.Encode()
+	if d.authUser != "" {
+		req.SetBasicAuth(d.authUser, d.authPass)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	result := make(map[string]bool)
+	for _, line := range strings.Split(strings.TrimSpace(string(body)), "\n") {
+		// TabSeparated: symbol\tHH:MM
+		parts := strings.Split(line, "\t")
+		if len(parts) >= 2 {
+			// key 格式: "date|symbol|HH:MM"，含日期维度，避免跨日误判
+			key := dateStr + "|" + strings.TrimSpace(parts[0]) + "|" + strings.TrimSpace(parts[1])
+			result[key] = true
+		}
+	}
+	return result, nil
+}
+
 func (d *ClickHouseDriver) ImportGBBQ(path string) error {
 	d.TruncateTable(model.TableGbbq)
 	return d.ImportCSV(model.TableGbbq, path)
