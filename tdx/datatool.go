@@ -8,11 +8,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 )
+
+var extractMu sync.Mutex
 
 //go:embed  embed/*
 var embedFS embed.FS
@@ -90,7 +93,16 @@ func datatoolExec(cacheDir, vipdocDir, subCommand string, endDate time.Time) err
 
 
 func extractDatatool(cacheDir string) (string, error) {
-	toolPath, err := extractFileFromEmbed(cacheDir, "embed/datatool")
+	extractMu.Lock()
+	defer extractMu.Unlock()
+
+	toolPath := filepath.Join(cacheDir, "datatool")
+	// 如果已经提取过了，直接返回，避免重复写入引起 text file busy
+	if _, err := os.Stat(toolPath); err == nil {
+		return toolPath, nil
+	}
+
+	_, err := extractFileFromEmbed(cacheDir, "embed/datatool")
 	if err != nil {
 		return "", fmt.Errorf("failed to extract binary: %w", err)
 	}
