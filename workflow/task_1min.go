@@ -14,6 +14,14 @@ import (
 	"github.com/jing2uo/tdx2db/tdx"
 )
 
+// datetimeFormats 是 CSV datetime 字段可能的格式列表，按优先级排序。
+// CSVWriter 默认用 time.RFC3339（"2006-01-02T15:04:05Z07:00"），
+// 兼容旧版可能使用的空格分隔格式。
+var datetimeFormats = []string{
+	time.RFC3339,           // 2006-01-02T15:04:05+08:00
+	"2006-01-02 15:04:05", // 旧格式兼容
+}
+
 var TaskUpdate1Min *Task
 
 func init() {
@@ -97,11 +105,17 @@ func executeUpdate1Min(ctx context.Context, db database.DataRepository, args *Ta
 }
 
 // filterMissingFromCSV reads a CSV (with header "symbol,...datetime,..."),
-// queries ClickHouse for existing (date,symbol) pairs across validDates,
-// and writes only rows whose (date,symbol) are not found.
+// queries ClickHouse for existing (date,symbol,minute) triplets across validDates,
+// and writes only rows whose (date,symbol,minute) are not found AND whose date is in validDates.
 // Returns the number of rows written.
 func filterMissingFromCSV(db database.DataRepository, inputCSV, outputCSV string, validDates []time.Time) (int, error) {
-	// Build existing set: existing[symbol] for ALL valid dates combined
+	// Build valid date set (YYYY-MM-DD strings) — only rows in this set will be written
+	validDateSet := make(map[string]bool, len(validDates))
+	for _, d := range validDates {
+		validDateSet[d.Format("2006-01-02")] = true
+	}
+
+	// Build existing set: "date|symbol|HH:MM" keys for all valid dates
 	existing := make(map[string]bool)
 	for _, d := range validDates {
 		syms, err := db.QueryExisting1Min(d)
@@ -126,7 +140,6 @@ func filterMissingFromCSV(db database.DataRepository, inputCSV, outputCSV string
 	defer out.Close()
 
 	scanner := bufio.NewScanner(in)
-	// Increase buffer for large lines
 	scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024)
 
 	wrote := 0
@@ -134,36 +147,50 @@ func filterMissingFromCSV(db database.DataRepository, inputCSV, outputCSV string
 	for scanner.Scan() {
 		line := scanner.Text()
 		if firstLine {
-			// Write header unchanged
 			fmt.Fprintln(out, line)
 			firstLine = false
 			continue
 		}
+
 		// CSV format: symbol,open,high,low,close,amount,volume,datetime
-		// symbol is the first column; datetime is the last column
 		comma := strings.IndexByte(line, ',')
 		if comma < 0 {
 			continue
 		}
 		symbol := line[:comma]
 
-		// Extract date and HH:MM from datetime field (last column)
+		// datetime is the last column
 		lastComma := strings.LastIndexByte(line, ',')
 		if lastComma < 0 || lastComma <= comma {
 			continue
 		}
-		datetime := strings.Trim(line[lastComma+1:], "\"")
-		// datetime format: "2026-07-06 09:31:00" or similar
-		// date = datetime[:10] = "2026-07-06"
-		// minute = datetime[11:16] = "09:31"
-		if len(datetime) < 16 {
+		datetimeRaw := strings.Trim(line[lastComma+1:], "\"")
+
+		// CSVWriter 使用 time.RFC3339 序列化 datetime（如 "2026-06-29T09:31:00+08:00"）
+		// 用 time.Parse 解析，不依赖字符串偏移，兼容多种格式
+		var t time.Time
+		var parsed bool
+		for _, layout := range datetimeFormats {
+			if pt, err := time.Parse(layout, datetimeRaw); err == nil {
+				t = pt
+				parsed = true
+				break
+			}
+		}
+		if !parsed {
 			continue
 		}
-		date := datetime[:10]   // "2026-07-06"
-		minute := datetime[11:16] // "HH:MM"
+
+		dateStr := t.Format("2006-01-02") // "2026-06-29"
+		minStr := t.Format("15:04")       // "09:31"
+
+		// 只处理目标日期范围内的行，拒绝无关历史数据
+		if !validDateSet[dateStr] {
+			continue
+		}
 
 		// key 格式: "date|symbol|HH:MM"，与 QueryExisting1Min 保持一致
-		key := date + "|" + symbol + "|" + minute
+		key := dateStr + "|" + symbol + "|" + minStr
 		if existing[key] {
 			continue // skip — this (date, symbol, minute) already exists
 		}
