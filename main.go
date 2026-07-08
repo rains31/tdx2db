@@ -140,7 +140,7 @@ func main() {
 	cronCmd.Flags().BoolVar(&minEnable, "min", false, minInfo)
 	cronCmd.Flags().StringVar(&vipdocDir, "vipdocdir", "", "通达信 vipdoc 目录（可选，默认使用缓存目录）")
 	cronCmd.Flags().StringVar(&targetDate, "date", "", "指定同步日期 (YYYYMMDD，可选)")
-	cronCmd.Flags().BoolVar(&missingOnly, "missing-only", false, "仅补全缺失数据，不重复导入已存在的数据")
+	cronCmd.Flags().BoolVar(&missingOnly, "missing-only", true, "仅补全缺失数据，不重复导入已存在的数据 (默认启用，可使用 --missing-only=false 关闭)")
 	cronCmd.Flags().BoolVar(&force, "force", false, "强制覆盖：先删后导，以 TDX 数据为准（仅当指定 --date 时有效）")
 	cronCmd.Flags().BoolVar(&gbbqEnable, "gbbq", false, "强制更新/下载 gbbq 股本变迁数据（即使指定了 --force，默认也为 false）")
 
