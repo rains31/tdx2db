@@ -103,6 +103,7 @@ func main() {
 		allEnable    bool
 		dayEnable    bool
 		minEnable    bool
+		basicEnable  bool
 		blockEnable  bool
 		symbolEnable bool
 		gbbqEnable   bool
@@ -133,6 +134,7 @@ func main() {
 				All:          allEnable,
 				Day:          dayEnable,
 				Min:          minEnable,
+				Basic:        basicEnable,
 				Block:        blockEnable,
 				Symbol:       symbolEnable,
 				Gbbq:         gbbqEnable,
@@ -158,6 +160,7 @@ func main() {
 	cronCmd.Flags().BoolVar(&allEnable, "all", false, "导入所有类型的数据（全流程同步）")
 	cronCmd.Flags().BoolVar(&dayEnable, "day", false, "导入日线数据")
 	cronCmd.Flags().BoolVar(&minEnable, "min", false, minInfo)
+	cronCmd.Flags().BoolVar(&basicEnable, "basic", false, "计算并更新股票/ETF 基础行情衍生指标 (市值/换手率/前收盘等)")
 	cronCmd.Flags().BoolVar(&blockEnable, "block", false, "导入板块数据")
 	cronCmd.Flags().BoolVar(&symbolEnable, "symbol", false, "导入股票代码与名称数据")
 	cronCmd.Flags().BoolVar(&gbbqEnable, "gbbq", false, "导入 gbbq 股本变迁与复权数据")

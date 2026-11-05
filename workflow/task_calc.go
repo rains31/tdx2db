@@ -20,7 +20,7 @@ func init() {
 		Name:      "calc_basic",
 		DependsOn: []string{"update_daily", "update_gbbq"},
 		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
-			if !args.Day && !args.Gbbq {
+			if !args.Basic {
 				return true
 			}
 			if args.Plan != nil && !args.Plan.NeedBasic {

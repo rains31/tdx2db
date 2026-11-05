@@ -12,6 +12,7 @@ type CronOptions struct {
 	All          bool
 	Day          bool
 	Min          bool
+	Basic        bool
 	Block        bool
 	Symbol       bool
 	Gbbq         bool
@@ -53,13 +54,14 @@ func Cron(ctx context.Context, dbURI string, opts CronOptions) error {
 	today := GetToday()
 
 	// 开关决策：是否显式指定了任意一个特定类型
-	hasSpecific := opts.Day || opts.Min || opts.Block || opts.Symbol || opts.Gbbq
+	hasSpecific := opts.Day || opts.Min || opts.Basic || opts.Block || opts.Symbol || opts.Gbbq
 
-	var day, min, block, symbol, gbbq bool
+	var day, min, basic, block, symbol, gbbq bool
 	if hasSpecific && !opts.All {
 		// 精准模式：只执行用户明确开启的类型
 		day = opts.Day
 		min = opts.Min
+		basic = opts.Basic
 		block = opts.Block
 		symbol = opts.Symbol
 		gbbq = opts.Gbbq
@@ -67,12 +69,13 @@ func Cron(ctx context.Context, dbURI string, opts CronOptions) error {
 		// 全量/默认日常调度模式
 		day = true
 		min = opts.Min || opts.All
+		basic = true
 		block = true
 		symbol = true
 		gbbq = opts.Gbbq || opts.All
 	}
 
-	plan, err := workflow.BuildWorkPlan(db, today, day, min, opts.TargetDate, opts.MissingOnly, opts.Force, gbbq)
+	plan, err := workflow.BuildWorkPlan(db, today, day, min, basic, opts.TargetDate, opts.MissingOnly, opts.Force, gbbq)
 	if err != nil {
 		return err
 	}
@@ -88,6 +91,7 @@ func Cron(ctx context.Context, dbURI string, opts CronOptions) error {
 	args := &workflow.TaskArgs{
 		Day:         day,
 		Min:         min,
+		Basic:       basic,
 		Block:       block,
 		Symbol:      symbol,
 		Gbbq:        gbbq,

@@ -53,6 +53,7 @@ type Task struct {
 type TaskArgs struct {
 	Day         bool
 	Min         bool
+	Basic       bool
 	Block       bool
 	Symbol      bool
 	Gbbq        bool
