@@ -63,14 +63,14 @@ func executeUpdate1Min(ctx context.Context, db database.DataRepository, args *Ta
 		return nil, fmt.Errorf("failed to convert .01 files to csv: %w", err)
 	}
 
-	if args.Force && args.TargetDate != "" {
+	if args.Delete && args.TargetDate != "" {
 		t, _ := time.Parse("20060102", args.TargetDate)
 		dateStr := t.Format("2006-01-02")
 		nextStr := t.AddDate(0, 0, 1).Format("2006-01-02")
-		fmt.Printf("🗑️  强制覆盖: 删除 %s 分钟线...\n", dateStr)
+		fmt.Printf("🗑️  先清后导 (--delete): 删除 %s 分钟线...\n", dateStr)
 		if err := db.DeleteWhere(model.TableKline1Min.TableName,
 			fmt.Sprintf("datetime >= '%s' AND datetime < '%s'", dateStr, nextStr)); err != nil {
-			return nil, fmt.Errorf("delete 1min for force: %w", err)
+			return nil, fmt.Errorf("delete 1min for delete flag: %w", err)
 		}
 		// 等待 ClickHouse mutation 完成
 		for i := 0; i < 30; i++ {

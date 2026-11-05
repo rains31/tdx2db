@@ -54,6 +54,7 @@ type TaskArgs struct {
 	Min         bool
 	MissingOnly bool
 	Force       bool
+	Delete      bool
 	Gbbq        bool
 	TempDir     string
 	VipdocDir   string

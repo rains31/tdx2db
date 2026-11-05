@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/jing2uo/tdx2db/database"
 	"github.com/jing2uo/tdx2db/model"
@@ -56,6 +57,24 @@ func executeUpdateDaily(ctx context.Context, db database.DataRepository, args *T
 		return &TaskResult{State: StateSkipped, Message: "no new daily data"}, nil
 	}
 
+	// Delete 模式：先删除当天的日线数据
+	if args.Delete && args.TargetDate != "" {
+		t, _ := time.Parse("20060102", args.TargetDate)
+		dateStr := t.Format("2006-01-02")
+		fmt.Printf("🗑️  先清后导 (--delete): 删除 %s 日线...\n", dateStr)
+		if err := db.DeleteWhere(model.TableKlineDaily.TableName,
+			fmt.Sprintf("date = '%s'", dateStr)); err != nil {
+			return nil, fmt.Errorf("delete daily for delete flag: %w", err)
+		}
+		for i := 0; i < 30; i++ {
+			exists, _ := db.Exists(model.TableKlineDaily.TableName, fmt.Sprintf("date = '%s'", dateStr))
+			if !exists {
+				break
+			}
+			time.Sleep(time.Second)
+		}
+	}
+
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -81,6 +100,25 @@ func executeInitDaily(ctx context.Context, db database.DataRepository, args *Tas
 }
 
 func executeDailyImport(ctx context.Context, db database.DataRepository, args *TaskArgs, sourceDir string) (*TaskResult, error) {
+	// Delete 模式：先删除当天的日线数据
+	if args.Delete && args.TargetDate != "" {
+		t, _ := time.Parse("20060102", args.TargetDate)
+		dateStr := t.Format("2006-01-02")
+		fmt.Printf("🗑️  先清后导 (--delete): 删除 %s 日线...\n", dateStr)
+		if err := db.DeleteWhere(model.TableKlineDaily.TableName,
+			fmt.Sprintf("date = '%s'", dateStr)); err != nil {
+			return nil, fmt.Errorf("delete daily for delete flag: %w", err)
+		}
+		// 等待 ClickHouse mutation 完成
+		for i := 0; i < 30; i++ {
+			exists, _ := db.Exists(model.TableKlineDaily.TableName, fmt.Sprintf("date = '%s'", dateStr))
+			if !exists {
+				break
+			}
+			time.Sleep(time.Second)
+		}
+	}
+
 	fmt.Println("🐌 开始转换日线数据")
 
 	stockDailyCSV := filepath.Join(args.TempDir, "stock.csv")

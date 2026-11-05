@@ -98,14 +98,15 @@ func main() {
 	}
 
 	var (
-		dbURI       string
-		dayFileDir  string
-		minEnable   bool
-		vipdocDir   string
-		targetDate  string
-		missingOnly bool
-		force       bool
-		gbbqEnable  bool
+		dbURI        string
+		dayFileDir   string
+		minEnable    bool
+		vipdocDir    string
+		targetDate   string
+		missingOnly  bool
+		force        bool
+		deleteEnable bool
+		gbbqEnable   bool
 	)
 
 	var initCmd = &cobra.Command{
@@ -124,7 +125,7 @@ func main() {
 		Example: `  tdx2db cron --dburi 'clickhouse://localhost' --min
   tdx2db cron --dburi 'duckdb://./tdx.db'` + dbURIHelp,
 		RunE: func(c *cobra.Command, args []string) error {
-			return cmd.Cron(ctx, dbURI, minEnable, vipdocDir, targetDate, missingOnly, force, gbbqEnable)
+			return cmd.Cron(ctx, dbURI, minEnable, vipdocDir, targetDate, missingOnly, force, gbbqEnable, deleteEnable)
 		},
 	}
 
@@ -141,7 +142,8 @@ func main() {
 	cronCmd.Flags().StringVar(&vipdocDir, "vipdocdir", "", "通达信 vipdoc 目录（可选，默认使用缓存目录）")
 	cronCmd.Flags().StringVar(&targetDate, "date", "", "指定同步日期 (YYYYMMDD，可选)")
 	cronCmd.Flags().BoolVar(&missingOnly, "missing-only", true, "仅补全缺失数据，不重复导入已存在的数据 (默认启用，可使用 --missing-only=false 关闭)")
-	cronCmd.Flags().BoolVar(&force, "force", false, "强制覆盖：先删后导，以 TDX 数据为准（仅当指定 --date 时有效）")
+	cronCmd.Flags().BoolVar(&force, "force", false, "强制放行规划：跳过最新日期等检查，以 TDX 数据为准（默认不删除历史数据）")
+	cronCmd.Flags().BoolVar(&deleteEnable, "delete", false, "先清后导：导入前删除目标日期的已有数据（默认 false，仅当指定 --date 时有效）")
 	cronCmd.Flags().BoolVar(&gbbqEnable, "gbbq", false, "强制更新/下载 gbbq 股本变迁数据（即使指定了 --force，默认也为 false）")
 
 	// FillDaily command

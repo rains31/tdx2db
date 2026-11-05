@@ -8,7 +8,7 @@ import (
 	"github.com/jing2uo/tdx2db/workflow"
 )
 
-func Cron(ctx context.Context, dbURI string, min bool, vipdocDir string, targetDate string, missingOnly bool, force bool, gbbq bool) error {
+func Cron(ctx context.Context, dbURI string, min bool, vipdocDir string, targetDate string, missingOnly bool, force bool, gbbq bool, deleteEnable bool) error {
 	if vipdocDir != "" {
 		VipdocDir = vipdocDir
 	}
@@ -55,6 +55,7 @@ func Cron(ctx context.Context, dbURI string, min bool, vipdocDir string, targetD
 		Min:         min,
 		MissingOnly: missingOnly,
 		Force:       force,
+		Delete:      deleteEnable,
 		Gbbq:        gbbq,
 		TempDir:     TempDir,
 		VipdocDir:   VipdocDir,
