@@ -12,6 +12,9 @@ func TestClassifyCodeSeparatesBShare(t *testing.T) {
 		{symbol: "sh900936", want: ClassBStock},
 		{symbol: "sz200541", want: ClassBStock},
 		{symbol: "sh510300", want: ClassETF},
+		{symbol: "sh113050", want: ClassBond},
+		{symbol: "sz123001", want: ClassBond},
+		{symbol: "sz128012", want: ClassBond},
 	}
 
 	for _, tt := range tests {

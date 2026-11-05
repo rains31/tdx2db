@@ -9,7 +9,7 @@ const SchemaMajor = 6
 
 // SchemaMinor 表示数据库 schema 的次版本号。
 // 当发生非破坏性变更（新增表、新增字段等）时递增。
-const SchemaMinor = 0
+const SchemaMinor = 1
 
 type KlineDay struct {
 	Symbol    string    `col:"symbol"`
@@ -75,12 +75,13 @@ type Holiday struct {
 }
 
 type BlockInfo struct {
-	BlockType   string `col:"block_type"`
-	BlockName   string `col:"block_name"`
-	BlockSymbol string `col:"block_symbol"`
-	BlockCode   string `col:"block_code"`
-	ParentCode  string `col:"parent_code"`
-	BlockLevel  int    `col:"block_level"`
+	BlockType    string `col:"block_type"`
+	BlockName    string `col:"block_name"`
+	BlockSymbol  string `col:"block_symbol"`
+	BlockCode    string `col:"block_code"`
+	ParentCode   string `col:"parent_code"`
+	BlockLevel   int    `col:"block_level"`
+	RepStockCode string `col:"rep_stock_code"`
 }
 
 type BlockMember struct {
@@ -89,9 +90,11 @@ type BlockMember struct {
 }
 
 type SymbolName struct {
-	Symbol string `col:"symbol"`
-	Name   string `col:"name"`
-	Class  string `col:"class"`
+	Symbol    string `col:"symbol"`
+	Name      string `col:"name"`
+	Class     string `col:"class"`
+	QmtSymbol string `col:"qmt_symbol"`
+	ThsSymbol string `col:"ths_symbol"`
 }
 
 type Meta struct {

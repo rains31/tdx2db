@@ -51,6 +51,7 @@ var (
 	ViewETFBFQ   = DefineView(stockBFQView("v_etf_bfq", "etf"))
 	ViewETFQFQ   = DefineView(adjustedQFQView("v_etf_qfq", "etf", 3))
 	ViewETFHFQ   = DefineView(adjustedHFQView("v_etf_hfq", "etf", 3))
+	ViewBondBFQ  = DefineView(stockBFQView("v_bond_bfq", "bond"))
 
 	ViewDailyBFQ = DefineView(unifiedBFQView("v_bfq_daily"))
 	ViewDailyQFQ = DefineView(unifiedQFQView("v_qfq_daily"))
@@ -204,7 +205,7 @@ func unifiedBFQView(name string) ViewDef {
 			CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END AS hfq_factor,
 			CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END / CASE WHEN COALESCE(lf.latest_hfq, 0) <= 0 THEN 1.0 ELSE lf.latest_hfq END AS qfq_factor
 		FROM %s s
-		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index')
+		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index', 'bond')
 		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
 		LEFT JOIN latest_factors lf ON s.symbol = lf.symbol
 		LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
@@ -237,7 +238,7 @@ func unifiedHFQView(name string) ViewDef {
 			b.amplitude  AS amplitude,
 			CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END AS hfq_factor
 		FROM %s s
-		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index')
+		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index', 'bond')
 		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
 		LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
 	`,
@@ -273,7 +274,7 @@ func unifiedQFQView(name string) ViewDef {
 			b.amplitude  AS amplitude,
 			CASE WHEN COALESCE(f.hfq_factor, 0) <= 0 THEN 1.0 ELSE f.hfq_factor END / CASE WHEN COALESCE(lf.latest_hfq, 0) <= 0 THEN 1.0 ELSE lf.latest_hfq END AS qfq_factor
 		FROM %s s
-		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index')
+		INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class IN ('stock', 'etf', 'index', 'bond')
 		LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
 		LEFT JOIN latest_factors lf ON s.symbol = lf.symbol
 		LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date

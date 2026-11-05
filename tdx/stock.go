@@ -62,7 +62,7 @@ func FetchOnlineSymbolNames(ctx context.Context) ([]model.SymbolName, error) {
 
 func isOnlineSymbolNameClass(class string) bool {
 	switch class {
-	case model.ClassStock, model.ClassBStock, model.ClassETF, model.ClassIndex:
+	case model.ClassStock, model.ClassBStock, model.ClassETF, model.ClassIndex, model.ClassBond:
 		return true
 	}
 	return false

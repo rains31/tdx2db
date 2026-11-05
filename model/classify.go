@@ -7,6 +7,7 @@ const (
 	ClassBStock  = "bstock"
 	ClassIndex   = "index"
 	ClassETF     = "etf"
+	ClassBond    = "bond"
 	ClassBlock   = "block"
 	ClassUnknown = "unknown"
 )
@@ -32,6 +33,8 @@ var classRules = []struct {
 	{"sh", "50", ClassETF}, {"sh", "51", ClassETF},
 	{"sh", "52", ClassETF}, {"sh", "53", ClassETF},
 	{"sh", "56", ClassETF}, {"sh", "58", ClassETF},
+	// 沪市可转债 / 债券 (110, 111, 112, 113, 118 等)
+	{"sh", "11", ClassBond},
 
 	// 深市股票
 	{"sz", "000", ClassStock}, {"sz", "001", ClassStock},
@@ -45,6 +48,8 @@ var classRules = []struct {
 	// 深市 ETF (15) / LOF (16/18)
 	{"sz", "15", ClassETF}, {"sz", "16", ClassETF},
 	{"sz", "18", ClassETF},
+	// 深市可转债 / 债券 (123, 127, 128, 13 等)
+	{"sz", "12", ClassBond}, {"sz", "13", ClassBond},
 
 	// 北交所股票
 	{"bj", "43", ClassStock}, {"bj", "83", ClassStock},
