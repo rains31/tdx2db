@@ -35,6 +35,8 @@ func TestPriceScaleKeepsBSharePrecision(t *testing.T) {
 		{symbol: "sh900936", want: 1000},
 		{symbol: "sz200541", want: 1000},
 		{symbol: "sh510300", want: 1000},
+		{symbol: "sh113050", want: 10000},
+		{symbol: "sz123001", want: 10000},
 	}
 
 	for _, tt := range tests {
