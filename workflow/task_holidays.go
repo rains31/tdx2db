@@ -16,7 +16,12 @@ func init() {
 	TaskUpdateHolidays = &Task{
 		Name:      "update_holidays",
 		DependsOn: []string{"fetch_gbbq"},
-		SkipIf:    skipIfPlan(func(p *WorkPlan) bool { return !p.NeedHolidays }),
+		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
+			if !args.Gbbq {
+				return true
+			}
+			return args.Plan != nil && !args.Plan.NeedHolidays
+		},
 		Executor:  executeUpdateHolidays,
 		OnError:   ErrorModeSkip,
 	}

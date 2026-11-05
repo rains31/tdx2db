@@ -8,9 +8,23 @@ import (
 	"github.com/jing2uo/tdx2db/workflow"
 )
 
-func Cron(ctx context.Context, dbURI string, min bool, vipdocDir string, targetDate string, missingOnly bool, force bool, gbbq bool, deleteEnable bool) error {
-	if vipdocDir != "" {
-		VipdocDir = vipdocDir
+type CronOptions struct {
+	All          bool
+	Day          bool
+	Min          bool
+	Block        bool
+	Symbol       bool
+	Gbbq         bool
+	VipdocDir    string
+	TargetDate   string
+	MissingOnly  bool
+	Force        bool
+	DeleteEnable bool
+}
+
+func Cron(ctx context.Context, dbURI string, opts CronOptions) error {
+	if opts.VipdocDir != "" {
+		VipdocDir = opts.VipdocDir
 	}
 
 	db, err := database.NewDB(dbURI)
@@ -38,29 +52,53 @@ func Cron(ctx context.Context, dbURI string, min bool, vipdocDir string, targetD
 
 	today := GetToday()
 
-	plan, err := workflow.BuildWorkPlan(db, today, min, targetDate, missingOnly, force, gbbq)
+	// 开关决策：是否显式指定了任意一个特定类型
+	hasSpecific := opts.Day || opts.Min || opts.Block || opts.Symbol || opts.Gbbq
+
+	var day, min, block, symbol, gbbq bool
+	if hasSpecific && !opts.All {
+		// 精准模式：只执行用户明确开启的类型
+		day = opts.Day
+		min = opts.Min
+		block = opts.Block
+		symbol = opts.Symbol
+		gbbq = opts.Gbbq
+	} else {
+		// 全量/默认日常调度模式
+		day = true
+		min = opts.Min || opts.All
+		block = true
+		symbol = true
+		gbbq = opts.Gbbq || opts.All
+	}
+
+	plan, err := workflow.BuildWorkPlan(db, today, day, min, opts.TargetDate, opts.MissingOnly, opts.Force, gbbq)
 	if err != nil {
 		return err
 	}
 	if plan.Reason != "" {
 		fmt.Println(plan.Reason)
 	}
-	if !plan.AnyNeeded() {
+	if !plan.AnyNeeded() && !block && !symbol {
 		return nil
 	}
 
 	executor := workflow.NewTaskExecutor(db, workflow.GetRegisteredTasks())
 
 	args := &workflow.TaskArgs{
+		Day:         day,
 		Min:         min,
-		MissingOnly: missingOnly,
-		Force:       force,
-		Delete:      deleteEnable,
+		Block:       block,
+		Symbol:      symbol,
 		Gbbq:        gbbq,
+		All:         opts.All,
+		MissingOnly: opts.MissingOnly,
+		Force:       opts.Force,
+		Delete:      opts.DeleteEnable,
 		TempDir:     TempDir,
 		VipdocDir:   VipdocDir,
 		Today:       today,
-		TargetDate:  targetDate,
+		TargetDate:  opts.TargetDate,
 		Plan:        plan,
 	}
 

@@ -24,7 +24,15 @@ func init() {
 	TaskUpdateDaily = &Task{
 		Name:      "update_daily",
 		DependsOn: []string{},
-		SkipIf:    skipIfPlan(func(p *WorkPlan) bool { return !p.NeedDaily }),
+		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
+			if !args.Day {
+				return true
+			}
+			if args.Plan != nil && !args.Plan.NeedDaily {
+				return true
+			}
+			return false
+		},
 		Executor:  executeUpdateDaily,
 	}
 	registerTask(TaskUpdateDaily, "update")

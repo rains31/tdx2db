@@ -15,7 +15,12 @@ func init() {
 	TaskFetchGBBQ = &Task{
 		Name:      "fetch_gbbq",
 		DependsOn: []string{},
-		SkipIf:    skipIfPlan(func(p *WorkPlan) bool { return !p.NeedGbbq }),
+		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
+			if !args.Gbbq {
+				return true
+			}
+			return args.Plan != nil && !args.Plan.NeedGbbq
+		},
 		Executor:  executeFetchGBBQ,
 	}
 	registerTask(TaskFetchGBBQ, "update")

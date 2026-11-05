@@ -17,6 +17,9 @@ func init() {
 	TaskUpdateBlocks = &Task{
 		Name:      "update_blocks",
 		DependsOn: []string{},
+		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
+			return !args.Block
+		},
 		Executor:  executeUpdateBlocks,
 		OnError:   ErrorModeSkip,
 	}

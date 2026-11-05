@@ -51,11 +51,15 @@ type Task struct {
 }
 
 type TaskArgs struct {
+	Day         bool
 	Min         bool
+	Block       bool
+	Symbol      bool
+	Gbbq        bool
+	All         bool
 	MissingOnly bool
 	Force       bool
 	Delete      bool
-	Gbbq        bool
 	TempDir     string
 	VipdocDir   string
 	DayFileDir  string

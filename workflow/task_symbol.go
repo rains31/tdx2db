@@ -24,6 +24,9 @@ func init() {
 	TaskUpdateSymbolNames = &Task{
 		Name:      "update_symbol_names",
 		DependsOn: []string{},
+		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
+			return !args.Symbol
+		},
 		Executor:  executeUpdateSymbolNames,
 		OnError:   ErrorModeSkip,
 	}

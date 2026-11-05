@@ -31,7 +31,7 @@ func (p *WorkPlan) AnyNeeded() bool {
 }
 
 // BuildWorkPlan 读取交易日历与各表最新日期，推导本次 cron 要做什么。
-func BuildWorkPlan(db database.DataRepository, today time.Time, min bool, targetDate string, missingOnly bool, force bool, gbbq bool) (*WorkPlan, error) {
+func BuildWorkPlan(db database.DataRepository, today time.Time, day bool, min bool, targetDate string, missingOnly bool, force bool, gbbq bool) (*WorkPlan, error) {
 	holidays, err := db.GetHolidays()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load holidays: %w", err)
@@ -180,6 +180,20 @@ func BuildWorkPlan(db database.DataRepository, today time.Time, min bool, target
 				}
 			}
 		}
+	}
+
+	// 根据用户显式指定的开关裁剪规划
+	if !day {
+		plan.NeedDaily = false
+		plan.NeedBasic = false
+	}
+	if !gbbq {
+		plan.NeedGbbq = false
+		plan.NeedFactor = false
+		plan.NeedHolidays = false
+	}
+	if !min {
+		plan.NeedMin = false
 	}
 
 	plan.Reason = describePlan(plan, dailyLatest)

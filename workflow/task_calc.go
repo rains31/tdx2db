@@ -19,7 +19,15 @@ func init() {
 	TaskCalcBasic = &Task{
 		Name:      "calc_basic",
 		DependsOn: []string{"update_daily", "update_gbbq"},
-		SkipIf:    skipIfPlan(func(p *WorkPlan) bool { return !p.NeedBasic }),
+		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
+			if !args.Day && !args.Gbbq {
+				return true
+			}
+			if args.Plan != nil && !args.Plan.NeedBasic {
+				return true
+			}
+			return false
+		},
 		Executor:  executeCalcBasic,
 	}
 	registerTask(TaskCalcBasic, "update")
@@ -27,7 +35,15 @@ func init() {
 	TaskCalcFactor = &Task{
 		Name:      "calc_factor",
 		DependsOn: []string{"calc_basic"},
-		SkipIf:    skipIfPlan(func(p *WorkPlan) bool { return !p.NeedFactor }),
+		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
+			if !args.Gbbq {
+				return true
+			}
+			if args.Plan != nil && !args.Plan.NeedFactor {
+				return true
+			}
+			return false
+		},
 		Executor:  executeCalcFactor,
 	}
 	registerTask(TaskCalcFactor, "update")

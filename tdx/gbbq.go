@@ -113,7 +113,7 @@ func fastParseDate(date uint32) (time.Time, error) {
 	if m < 1 || m > 12 || d < 1 || d > 31 {
 		return time.Time{}, fmt.Errorf("invalid date: %d", date)
 	}
-	return time.Date(y, time.Month(m), d, 0, 0, 0, 0, time.Local), nil
+	return time.Date(y, time.Month(m), d, 0, 0, 0, 0, cnLoc), nil
 }
 
 // decryptBlockToBuf 优化后的解密函数
