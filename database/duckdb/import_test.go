@@ -30,9 +30,9 @@ func TestDuckDBImportMissing(t *testing.T) {
 
 	// 1. 构造日常数据并测试缺失插入
 	csv1 := filepath.Join(tmpDir, "daily1.csv")
-	content1 := `symbol,open,high,low,close,amount,volume,date
-sh600000,10.0,10.5,9.9,10.2,100000,5000,2026-11-05
-sh600001,15.0,15.5,14.9,15.2,200000,8000,2026-11-05
+	content1 := `symbol,open,high,low,close,amount,volume,up_count,down_count,date
+sh600000,10.0,10.5,9.9,10.2,100000,5000,0,0,2026-11-05
+sh600001,15.0,15.5,14.9,15.2,200000,8000,0,0,2026-11-05
 `
 	if err := os.WriteFile(csv1, []byte(content1), 0644); err != nil {
 		t.Fatal(err)
@@ -48,10 +48,10 @@ sh600001,15.0,15.5,14.9,15.2,200000,8000,2026-11-05
 
 	// 2. 构造包含重复和新记录的 CSV
 	csv2 := filepath.Join(tmpDir, "daily2.csv")
-	content2 := `symbol,open,high,low,close,amount,volume,date
-sh600000,10.0,10.5,9.9,10.2,100000,5000,2026-11-05
-sh600001,15.0,15.5,14.9,15.2,200000,8000,2026-11-05
-sh600002,20.0,20.5,19.9,20.2,300000,9000,2026-11-05
+	content2 := `symbol,open,high,low,close,amount,volume,up_count,down_count,date
+sh600000,10.0,10.5,9.9,10.2,100000,5000,0,0,2026-11-05
+sh600001,15.0,15.5,14.9,15.2,200000,8000,0,0,2026-11-05
+sh600002,20.0,20.5,19.9,20.2,300000,9000,0,0,2026-11-05
 `
 	if err := os.WriteFile(csv2, []byte(content2), 0644); err != nil {
 		t.Fatal(err)
