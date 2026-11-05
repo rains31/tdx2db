@@ -31,6 +31,14 @@ func executeUpdateBlocks(ctx context.Context, db database.DataRepository, args *
 		return nil, fmt.Errorf("failed to fetch online blocks: %w", err)
 	}
 
+	// Derive parent-child relationships from membership overlap and backfill ParentCode
+	parents := tdx.DeriveParentCodes(blockInfos, blockMembers)
+	for i := range blockInfos {
+		if parent, ok := parents[blockInfos[i].BlockSymbol]; ok {
+			blockInfos[i].ParentCode = parent
+		}
+	}
+
 	infoCSV := filepath.Join(args.TempDir, "tdx_blocks_info.csv")
 	infoWriter, err := utils.NewCSVWriter[model.BlockInfo](infoCSV)
 	if err != nil {

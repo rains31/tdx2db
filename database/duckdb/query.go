@@ -173,3 +173,8 @@ func (d *DuckDBDriver) Exists(table string, where string, args ...interface{}) (
 	return true, nil
 }
 
+// DeleteWhere — DuckDB stub (force mode is ClickHouse-only)
+func (d *DuckDBDriver) DeleteWhere(table string, where string, args ...interface{}) error {
+	return nil
+}
+

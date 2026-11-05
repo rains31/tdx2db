@@ -3,6 +3,8 @@ package clickhouse
 import (
 	"database/sql"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -48,6 +50,32 @@ func (d *ClickHouseDriver) GetMinDate(tableName string, dateCol string) (time.Ti
 		return time.Time{}, nil
 	}
 	return earliest.Time, nil
+}
+
+// DeleteWhere deletes rows matching a WHERE clause (for force mode).
+// Note: ClickHouse ALTER TABLE DELETE does not support parameterized placeholders,
+// so where must already have values inlined (e.g. "date = '2026-07-03'").
+func (d *ClickHouseDriver) DeleteWhere(tableName string, where string, args ...interface{}) error {
+	query := fmt.Sprintf("ALTER TABLE %s DELETE WHERE %s", tableName, where)
+	// ClickHouse DELETE uses mutations — use raw query via HTTP for reliability
+	req, _ := http.NewRequest("POST", d.httpImportUrl, strings.NewReader(query))
+	if d.authUser != "" {
+		req.SetBasicAuth(d.authUser, d.authPass)
+	}
+	q := req.URL.Query()
+	q.Set("database", d.database)
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("delete failed %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return nil
 }
 
 func (d *ClickHouseDriver) GetSymbolsByClass(classes ...string) ([]string, error) {

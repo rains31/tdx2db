@@ -47,6 +47,18 @@ func (d *DuckDBDriver) createTableInternal(meta *model.TableMeta) error {
 	if err != nil {
 		return fmt.Errorf("failed to create table %s: %w", meta.TableName, err)
 	}
+
+	// Ensure all columns exist (auto-patch for schema upgrades)
+	for _, col := range meta.Columns {
+		sqlType := d.mapType(col.Type)
+		alter := fmt.Sprintf(
+			"ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s",
+			meta.TableName, col.Name, sqlType,
+		)
+		if _, err := d.db.Exec(alter); err != nil {
+			return fmt.Errorf("add column %s to %s: %w", col.Name, meta.TableName, err)
+		}
+	}
 	return nil
 }
 

@@ -89,7 +89,22 @@ func (d *ClickHouseDriver) createTableInternal(meta *model.TableMeta) error {
 	`, meta.TableName, strings.Join(colDefs, ", "), orderBy)
 
 	_, err := d.db.Exec(query)
-	return err
+	if err != nil {
+		return fmt.Errorf("create table %s: %w", meta.TableName, err)
+	}
+
+	// 4. 确保已有表包含所有列（自动补列，schema 升级兼容）
+	for _, col := range meta.Columns {
+		alter := fmt.Sprintf(
+			"ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s",
+			meta.TableName, col.Name, d.mapType(col),
+		)
+		if _, err := d.db.Exec(alter); err != nil {
+			return fmt.Errorf("add column %s to %s: %w", col.Name, meta.TableName, err)
+		}
+	}
+
+	return nil
 }
 
 func cleanOrderByKey(keys []string) []string {

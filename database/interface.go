@@ -17,7 +17,9 @@ type DataRepository interface {
 
 	ImportCSV(meta *model.TableMeta, csvPath string) error
 	ImportKlineDaily(csvPath string) error
+	ImportKlineDailyMissing(csvPath string) (int64, error)
 	ImportKline1Min(csvPath string) error
+	ImportKline1MinMissing(csvPath string) (int64, error)
 	ImportAdjustFactors(csvPath string) error
 	ImportGBBQ(csvPath string) error
 	ImportBasic(csvPath string) error
@@ -41,5 +43,14 @@ type DataRepository interface {
 	GetHolidays() ([]time.Time, error)
 
 	Exists(table string, where string, args ...interface{}) (bool, error)
+
+	// QueryExisting1Min returns symbols that already have 1min data on the given date
+	QueryExisting1Min(date time.Time) (map[string]bool, error)
+
+	// QueryExistingDaily returns existing (date, symbol) pairs as "date|symbol" keys
+	QueryExistingDaily(dates []time.Time) (map[string]bool, error)
+
+	// DeleteWhere deletes rows matching a WHERE clause (for force mode)
+	DeleteWhere(table string, where string, args ...interface{}) error
 }
 

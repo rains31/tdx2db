@@ -12,6 +12,9 @@ import (
 	"github.com/jing2uo/tdx2db/utils"
 )
 
+// ExtraDailyValidDates 是 update_daily 写入 args.Extra 的 key
+const ExtraDailyValidDates = "daily_valid_dates"
+
 var (
 	TaskUpdateDaily *Task
 	TaskInitDaily   *Task
@@ -56,6 +59,11 @@ func executeUpdateDaily(ctx context.Context, db database.DataRepository, args *T
 		fmt.Println("🌲 日线数据无需更新")
 		return &TaskResult{State: StateSkipped, Message: "no new daily data"}, nil
 	}
+
+	if args.Extra == nil {
+		args.Extra = map[string]interface{}{}
+	}
+	args.Extra[ExtraDailyValidDates] = validDates
 
 	// Delete 模式：先删除当天的日线数据
 	if args.Delete && args.TargetDate != "" {
@@ -134,14 +142,33 @@ func executeDailyImport(ctx context.Context, db database.DataRepository, args *T
 	default:
 	}
 
-	if err := db.ImportKlineDaily(stockDailyCSV); err != nil {
-		return nil, fmt.Errorf("failed to import stock csv: %w", err)
+	// 方案 A: 若未传 --delete 且开启了 missing-only (默认开启)，通过临时表在库内进行差集比对，仅插入缺失数据
+	if args.Delete {
+		if err := db.ImportKlineDaily(stockDailyCSV); err != nil {
+			return nil, fmt.Errorf("failed to import stock csv: %w", err)
+		}
+		fmt.Println("🚀 股票数据全量导入成功")
+	} else if args.MissingOnly {
+		n, err := db.ImportKlineDailyMissing(stockDailyCSV)
+		if err != nil {
+			return nil, fmt.Errorf("failed to import missing daily data: %w", err)
+		}
+		if n == 0 {
+			fmt.Println("📊 日线数据全部已存在，无需补全")
+		} else {
+			fmt.Printf("📥 库内差集去重完成，成功补全 %d 行日线数据\n", n)
+		}
+	} else {
+		if err := db.ImportKlineDaily(stockDailyCSV); err != nil {
+			return nil, fmt.Errorf("failed to import stock csv: %w", err)
+		}
+		fmt.Println("🚀 股票数据全量导入成功 (--missing-only=false)")
 	}
 
 	if err := db.RebuildSymbolClass(); err != nil {
 		return nil, fmt.Errorf("failed to rebuild symbol_class: %w", err)
 	}
 
-	fmt.Println("🚀 股票数据导入成功")
+	fmt.Println("🚀 股票数据处理成功")
 	return &TaskResult{State: StateCompleted, Message: "daily data imported"}, nil
 }
