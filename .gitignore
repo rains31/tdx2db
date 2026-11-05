@@ -2,3 +2,6 @@ tdx2db
 datatool
 datatool.exe
 .tmp
+.DS_Store
+**/.DS_Store
+
