@@ -295,7 +295,7 @@ func collectFiles(root string, suffix string) ([]string, error) {
 				}
 			} else if strings.HasSuffix(fullPath, suffix) {
 				symbol := strings.TrimSuffix(entry.Name(), suffix)
-				if symbolPattern.MatchString(symbol) {
+				if symbolPattern.MatchString(symbol) && model.IsCoreSecurity(symbol) {
 					files = append(files, fullPath)
 				}
 			}

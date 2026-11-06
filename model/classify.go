@@ -55,6 +55,8 @@ var classRules = []struct {
 	{"bj", "43", ClassStock}, {"bj", "83", ClassStock},
 	{"bj", "87", ClassStock}, {"bj", "88", ClassStock},
 	{"bj", "920", ClassStock},
+	// 北交所债券
+	{"bj", "82", ClassBond},
 	// 北交所指数
 	{"bj", "899", ClassIndex},
 }
@@ -131,4 +133,19 @@ func SymbolFromCode(code string) (string, bool) {
 		return code, false
 	}
 	return bestMarket + code, true
+}
+
+// IsCoreSecurity 判断 symbol 是否为核心交易品种（A股股票、ETF基金、指数/板块指数、债券/可转债）。
+// 过滤掉 B 股、期权合约、逆回购、未知及历史退市冷门代码。
+func IsCoreSecurity(symbol string) bool {
+	// 明确排除国债逆回购: 沪市 sh204xxx (GC001~182), 深市 sz1318xx (R-001~182)
+	if strings.HasPrefix(symbol, "sh204") || strings.HasPrefix(symbol, "sz1318") {
+		return false
+	}
+	class := ClassifyCode(symbol)
+	switch class {
+	case ClassStock, ClassETF, ClassIndex, ClassBlock, ClassBond:
+		return true
+	}
+	return false
 }

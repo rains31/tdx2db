@@ -87,3 +87,17 @@ cp /path/to/tdx2db/tdx2db tdx2db.new && chmod 775 tdx2db.new && mv -f tdx2db.new
 
 > 项目依赖的 duckdb 需要 cgo，跨平台构建需要对应交叉编译工具链，因此请在目标平台
 > （Linux x86_64）上直接构建，不要从 macOS 交叉编译。
+
+## 补丁三：核心交易标的过滤 (, , )
+
+在收集 .day/.01 文件与合并日线数据时，通过 `model.IsCoreSecurity(symbol)` 严格限定标的范围：
+- 仅保留：A股股票 (ClassStock)、ETF/场内基金 (ClassETF)、指数 (ClassIndex)、板块指数 (ClassBlock)、债券/可转债 (ClassBond)；
+- 严格排除：B股 (ClassBStock)、期权合约 (sh2xxxxx, sz10xxxx, sz5xxxxx 等)、逆回购及其他未知/冷门代码 (ClassUnknown)；
+- 避免通达信解压产生 5 万多只冷门期权/杂项标的导致分钟线表膨胀数倍。
+
+## 补丁三：核心交易标的过滤 (model/classify.go, tdx/kline.go, tdx/merge.go)
+
+在收集 .day/.01 文件与合并日线数据时，通过 model.IsCoreSecurity(symbol) 严格限定标的范围：
+- 仅保留：A股股票 (ClassStock)、ETF/场内基金 (ClassETF)、指数 (ClassIndex)、板块指数 (ClassBlock)、债券/可转债 (ClassBond)；
+- 严格排除：B股 (ClassBStock)、期权合约 (sh2xxxxx, sz10xxxx, sz5xxxxx 等)、逆回购及其他未知/冷门代码 (ClassUnknown)；
+- 避免通达信解压产生 5 万多只冷门期权/杂项标的导致分钟线表膨胀数倍。

@@ -267,6 +267,9 @@ func mergeSingleDay(vipdocDir, exchange string, date uint32, codFile, md1File st
 		dayFilePath := filepath.Join(ldayDir, dayFileName)
 
 		symbol := exchange + ent.StockCode
+		if !model.IsCoreSecurity(symbol) {
+			continue
+		}
 		scale := model.PriceScale(symbol)
 		dayRec := makeDayRecord(date, ohlcv, scale, isIndexMode(symbol))
 

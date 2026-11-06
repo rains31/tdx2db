@@ -71,3 +71,45 @@ func TestSymbolFromCodeKeepsBShareMapping(t *testing.T) {
 		})
 	}
 }
+
+func TestIsCoreSecurity(t *testing.T) {
+	tests := []struct {
+		symbol string
+		want   bool
+	}{
+		// 核心品种: 股票/ETF/指数/板块指数/债券转债
+		{"sh600000", true},
+		{"sz000001", true},
+		{"sz300750", true},
+		{"sh688981", true},
+		{"bj920002", true},
+		{"sh510300", true},
+		{"sz159915", true},
+		{"sh000300", true},
+		{"sz399001", true},
+		{"sh880001", true},
+		{"sh113050", true},
+		{"sz123001", true},
+		{"bj821001", true},
+		// 非核心/期权/逆回购/B股等
+		{"sh900936", false}, // B股
+		{"sz200541", false}, // B股
+		{"sh232113", false}, // 沪市期权
+		{"sz104303", false}, // 深市期权
+		{"sz563772", false}, // sz5开头期权
+		{"sh171740", false}, // 逆回购/未知
+		{"sz131810", false}, // 深市逆回购 R-001
+		{"sh204001", false}, // 沪市逆回购 GC001
+		{"sh019536", false}, // 记账式国债
+		{"sh186905", false}, // 逆回购/未知
+		{"unknown", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.symbol, func(t *testing.T) {
+			if got := IsCoreSecurity(tt.symbol); got != tt.want {
+				t.Fatalf("IsCoreSecurity(%q) = %v, want %v", tt.symbol, got, tt.want)
+			}
+		})
+	}
+}
